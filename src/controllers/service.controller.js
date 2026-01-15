@@ -201,7 +201,7 @@ exports.getServiceTypeById = async (req, res) => {
 
 exports.createServiceCategory = async (req, res) => {
     try {
-        const { name, color_code, status = 1 } = req.body;
+        const { name, price, status = 1 } = req.body;
 
         if (!name || !color_code) {
             return res.status(400).json({
@@ -380,6 +380,199 @@ exports.getServiceCategoryById = async (req, res) => {
         res.json({
             success: true,
             data: rows[0],
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            error: err.message,
+        });
+    }
+};
+
+
+// = = = = =  Service Addon Controllers = = = = = //
+
+exports.createServiceAddon = async (req, res) => {
+    try {
+        const { name, price, status = 1 } = req.body;
+
+        if (!name || !price) {
+            return res.status(400).json({
+                success: false,
+                message: "Name and price are required",
+            });
+        }
+
+        // Auto-create table
+        const createTableSQL = `
+      CREATE TABLE IF NOT EXISTS service_addon (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        price DOUBLE(10, 2) NOT NULL,
+        status TINYINT(1) DEFAULT 1, -- 0 = inactive, 1 = active
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+        await db.query(createTableSQL);
+
+        // Insert Service Addon
+        const insertSQL = `
+      INSERT INTO service_addon (name, price, status)
+      VALUES (?, ?, ?)
+    `;
+
+        const [result] = await db.query(insertSQL, [
+            name.trim(),
+            price.trim(),
+            status,
+        ]);
+
+        res.status(201).json({
+            success: true,
+            message: "Service Addon created successfully",
+            data: {
+                id: result.insertId,
+                name,
+                price,
+                status,
+            },
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            error: err.message,
+        });
+    }
+};
+
+
+// GET All Service addon
+exports.getAllServiceaddon = async (req, res) => {
+    try {
+        const [rows] = await db.query(`SELECT * FROM service_addon ORDER BY id DESC`);
+
+        res.json({
+            success: true,
+            data: rows,
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            error: err.message,
+        });
+    }
+};
+
+// GET Service addon By ID
+exports.getServiceAddonById = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: "Service Addon ID is required",
+            });
+        }
+
+        const [rows] = await db.query(
+            `SELECT * FROM service_addon WHERE id = ? LIMIT 1`,
+            [id]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Service Addon not found",
+            });
+        }
+
+        res.json({
+            success: true,
+            data: rows[0],
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            error: err.message,
+        });
+    }
+};
+
+// UPDATE Service addon
+exports.updateServiceaddon = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, price, status } = req.body;
+
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: "Service addon ID is required",
+            });
+        }
+
+        const updateSQL = `
+      UPDATE service_addon
+      SET 
+        name = COALESCE(?, name),
+        price = COALESCE(?, price),
+        status = COALESCE(?, status)
+      WHERE id = ?
+    `;
+
+        const [result] = await db.query(updateSQL, [
+            name?.trim() || null,
+            price?.trim() || null,
+            status ?? null,
+            id,
+        ]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Service addon not found",
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Service addon updated successfully",
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            error: err.message,
+        });
+    }
+};
+
+// DELETE Service addon
+exports.deleteServiceAddon = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: "Service addon ID is required",
+            });
+        }
+
+        const deleteSQL = `DELETE FROM service_addon WHERE id = ?`;
+        const [result] = await db.query(deleteSQL, [id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Service Addon not found",
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Service addon deleted successfully",
         });
     } catch (err) {
         res.status(500).json({

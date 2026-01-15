@@ -12,6 +12,11 @@ const {
     updateServiceCategory,
     deleteServiceCategory,
     getAllServiceCategory,
+    createServiceAddon,
+    getAllServiceaddon,
+    getServiceAddonById,
+    updateServiceaddon,
+    deleteServiceAddon,
 } = require("../controllers/service.controller");
 
 // = = = = =  Service Type Routes = = = = = //
@@ -27,5 +32,12 @@ router.get("/categories/list", getAllServiceCategory);
 router.get("/categories/list/:id", getServiceCategoryById);
 router.put("/categories/update/:id", updateServiceCategory);
 router.delete("/categories/delete/:id", deleteServiceCategory);
+
+// = = = = =  Service Addon Routes = = = = = //
+router.post("/addon/create", createServiceAddon);
+router.get("/addon/list", getAllServiceaddon);
+router.get("/addon/list/:id", getServiceAddonById);
+router.put("/addon/update/:id", updateServiceaddon);
+router.delete("/addon/delete/:id", deleteServiceAddon);
 
 module.exports = router;
