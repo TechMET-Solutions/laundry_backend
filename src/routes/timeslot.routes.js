@@ -5,7 +5,9 @@ const router = express.Router();
 const {
     createTimeSlot,
     getAllTimeSlots,
-    getTimeSlotById
+    getTimeSlotById,
+    updateTimeSlot,
+    deleteTimeSlot
 
 } = require("../controllers/timeslot.controller");
 
@@ -13,14 +15,17 @@ const {
 // Create
 router.post("/create", createTimeSlot);
 
-// update
-// router.put("/update", updateTimeSlot);
-
 //get all 
-router.get("/list", getAllTimeSlots)
+router.get("/list", getAllTimeSlots);
 
 //get by id
 router.get("/:id", getTimeSlotById);
+
+//update
+router.put("/update/:id", updateTimeSlot);
+
+//delete
+router.delete("delete/:id", deleteTimeSlot);
 
 
 module.exports = router;

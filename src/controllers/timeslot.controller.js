@@ -93,8 +93,78 @@ exports.getTimeSlotById = async (req, res) => {
 };
 
 
+// UPDATE
+exports.updateTimeSlot = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { time_slot, status } = req.body;
+
+        // Validation: must provide something to update
+        if (!time_slot && status === undefined) {
+            return res.status(400).json({
+                success: false,
+                message: "No fields to update"
+            });
+        }
+
+        // Run the query FIRST
+        const [result] = await db.query(
+            `UPDATE timeslot 
+             SET time_slot = COALESCE(?, time_slot), 
+                 status = COALESCE(?, status)
+             WHERE id = ?`,
+            [time_slot, status, id]
+        );
+
+        // Check if any row was affected
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Time slot not found"
+            });
+        }
+
+        // Respond after query runs
+        res.status(200).json({
+            success: true,
+            message: "Time slot updated successfully"
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            error: err.message
+        });
+    }
+};
 
 
+// DELETE
+exports.deleteTimeSlot = async (req, res) => {
+    try {
+        const { id } = req.params;
 
+        const [result] = await db.query(
+            "DELETE FROM timeslot WHERE id = ?",
+            [id]
+        );
 
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Time slot not found"
+            });
+        }
 
+        res.status(200).json({
+            success: true,
+            message: "Time slot deleted successfully"
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            error: err.message
+        });
+    }
+};
