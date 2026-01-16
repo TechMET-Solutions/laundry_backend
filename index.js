@@ -11,6 +11,8 @@ const path = require("path");
 const employeeRoutes = require("./src/routes/employee.routes");
 const customerRoutes = require("./src/routes/customer.routes");
 const serviceRoutes = require("./src/routes/service.routes");
+const collectionRoutes = require("./src/routes/collection.routes");
+
 
 
 app.get("/", (req, res) => {
@@ -23,6 +25,8 @@ app.get("/", (req, res) => {
 app.use("/api/employees", employeeRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/service", serviceRoutes);
+app.use("/api/collections", collectionRoutes);
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, "0.0.0.0", () => {
