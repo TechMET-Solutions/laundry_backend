@@ -1,4 +1,4 @@
-const db = require("../../../laundry_backend-/config/database");
+const db = require("../../../laundry_backend/config/database");
 
 /**
  * CREATE COLLECTION
