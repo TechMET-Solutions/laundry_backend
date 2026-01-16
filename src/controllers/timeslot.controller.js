@@ -14,7 +14,6 @@ exports.createTimeSlot = async(req, res) => {
                 time_slot VARCHAR(50) NOT NULL UNIQUE,
                 status TINYINT(1) DEFAULT 1,
                 createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
-
             )
         `;
 
