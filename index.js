@@ -14,6 +14,7 @@ const serviceRoutes = require("./src/routes/service.routes");
 const collectionRoutes = require("./src/routes/collection.routes");
 const expensesRoutes = require("./src/routes/expenses.routes");
  
+const locationRoutes = require("./src/routes/locationManagement.routes");
 const timeslotRoutes = require("./src/routes/timeslot.routes");
  
  

@@ -7,13 +7,7 @@ exports.createEmirate = async (req, res) => {
   try {
     const { emirate, code, country, status = 1 } = req.body;
 
-    // Validation
-    // if (!emirate || !code || !country) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Emirate, code, and country are required",
-    //   });
-    // }
+     
 
     // Auto-create table
     const createTableSQL = `
