@@ -25,7 +25,6 @@ router.get("/:id", getTimeSlotById);
 router.put("/update/:id", updateTimeSlot);
 
 //delete
-router.delete("delete/:id", deleteTimeSlot);
-
+router.delete("/delete/:id", deleteTimeSlot);
 
 module.exports = router;
