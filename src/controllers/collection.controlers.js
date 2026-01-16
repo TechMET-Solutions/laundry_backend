@@ -2,6 +2,7 @@ const db = require("../../../laundry_backend/config/database");
 
 /**
  * CREATE COLLECTION
+ * (TMS/COL code based on LAST inserted value, NOT COUNT)
  */
 exports.createCollection = async (req, res) => {
   try {
@@ -15,27 +16,28 @@ exports.createCollection = async (req, res) => {
       driver_id,
       comments,
     } = req.body;
-    
-            const createTableSQL=`
-                CREATE TABLE IF NOT EXISTS collections(
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            collection_code VARCHAR(30) NOT NULL UNIQUE,
-            collection_type ENUM('CLOTH', 'PAYMENT') NOT NULL,
-            customer_id INT NOT NULL,
-            customer_type VARCHAR(50) NULL,
-            pickup_date DATE NOT NULL,
-            time_slot VARCHAR(50) NOT NULL,
-            phone_number VARCHAR(20) NOT NULL,
-            driver_id INT NOT NULL,
-            status ENUM('SCHEDULED', 'DONE', 'CANCELLED') NOT NULL DEFAULT 'SCHEDULED',
-            created_by ENUM('SHOP', 'ADMIN', 'EMPLOYEE') NOT NULL DEFAULT 'SHOP',
-            comments TEXT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 
-    )`;
- await db.query(createTableSQL);
+    // ❌ STOP creating tables inside APIs (keeping only because you insisted)
+    const createTableSQL = `
+      CREATE TABLE IF NOT EXISTS collections (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        collection_code VARCHAR(30) NOT NULL UNIQUE,
+        collection_type ENUM('CLOTH', 'PAYMENT') NOT NULL,
+        customer_id INT NOT NULL,
+        customer_type VARCHAR(50) NULL,
+        pickup_date DATE NOT NULL,
+        time_slot VARCHAR(50) NOT NULL,
+        phone_number VARCHAR(20) NOT NULL,
+        driver_id INT NOT NULL,
+        status ENUM('SCHEDULED', 'DONE', 'CANCELLED') NOT NULL DEFAULT 'SCHEDULED',
+        created_by ENUM('SHOP', 'ADMIN', 'EMPLOYEE') NOT NULL DEFAULT 'SHOP',
+        comments TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+    await db.query(createTableSQL);
 
-    
+    // 1. Validation
     if (
       !collection_type ||
       !customer_id ||
@@ -50,20 +52,47 @@ exports.createCollection = async (req, res) => {
       });
     }
 
-    
-    const [[{ total }]] = await db.query(
-      "SELECT COUNT(*) AS total FROM collections"
-    );
-    const collection_code = `TMS/COL-${String(total + 1).padStart(2, "0")}`;
+    // 2. Get LAST collection_code (NOT COUNT)
+    const [[lastRow]] = await db.query(`
+      SELECT collection_code
+      FROM collections
+      ORDER BY id DESC
+      LIMIT 1
+    `);
 
-    
+    let nextNumber = 1;
+
+    if (lastRow && lastRow.collection_code) {
+      const lastNumber = parseInt(
+        lastRow.collection_code.split("-").pop(),
+        10
+      );
+
+      if (!isNaN(lastNumber)) {
+        nextNumber = lastNumber + 1;
+      }
+    }
+
+    const collection_code = `TMS/COL-${String(nextNumber).padStart(2, "0")}`;
+
+    // 3. Customer type handling
     const finalCustomerType =
       collection_type === "PAYMENT" ? null : customer_type;
 
+    // 4. Insert
     const insertSQL = `
       INSERT INTO collections
-      (collection_code, collection_type, customer_id, customer_type,
-       pickup_date, time_slot, phone_number, driver_id, comments)
+      (
+        collection_code,
+        collection_type,
+        customer_id,
+        customer_type,
+        pickup_date,
+        time_slot,
+        phone_number,
+        driver_id,
+        comments
+      )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
@@ -85,12 +114,22 @@ exports.createCollection = async (req, res) => {
       collection_code,
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    if (err.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({
+        success: false,
+        message: "Duplicate collection code",
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 };
 
 /**
- * GET ALL COLLECTIONS (PAGINATION + FILTER READY)
+ * GET ALL COLLECTIONS (UNCHANGED)
  */
 exports.getAllCollections = async (req, res) => {
   try {
@@ -127,6 +166,9 @@ exports.getAllCollections = async (req, res) => {
   }
 };
 
+/**
+ * UPDATE COLLECTION (UNCHANGED)
+ */
 exports.updateCollection = async (req, res) => {
   try {
     const { id } = req.params;
@@ -158,7 +200,7 @@ exports.updateCollection = async (req, res) => {
 };
 
 /**
- * DELETE COLLECTION (HARD DELETE)
+ * DELETE COLLECTION (UNCHANGED)
  */
 exports.deleteCollection = async (req, res) => {
   try {
