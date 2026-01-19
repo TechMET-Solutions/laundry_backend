@@ -201,7 +201,7 @@ exports.getServiceTypeById = async (req, res) => {
 
 exports.createServiceCategory = async (req, res) => {
     try {
-        const { name, price, status = 1 } = req.body;
+        const { name, color_code, status = 1 } = req.body;
 
         if (!name || !color_code) {
             return res.status(400).json({
@@ -424,7 +424,7 @@ exports.createServiceAddon = async (req, res) => {
 
         const [result] = await db.query(insertSQL, [
             name.trim(),
-            price.trim(),
+            price,
             status,
         ]);
 
