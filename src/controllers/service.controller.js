@@ -424,7 +424,7 @@ exports.createServiceAddon = async (req, res) => {
 
         const [result] = await db.query(insertSQL, [
             name.trim(),
-            price,
+            price.trim(),
             status,
         ]);
 

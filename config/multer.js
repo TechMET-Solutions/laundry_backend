@@ -3,7 +3,7 @@ const path = require("path");
 const fs = require("fs");
 
 // 👉 Upload folder INSIDE BACKEND
-const uploadPath = path.join(__dirname, "..", "uploads");
+const uploadPath = path.join(__dirname, "..", "uploads/services");
 
 // 👉 Auto-create folder if missing
 if (!fs.existsSync(uploadPath)) {
