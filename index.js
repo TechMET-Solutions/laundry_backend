@@ -15,6 +15,7 @@ const collectionRoutes = require("./src/routes/collection.routes");
 const expensesRoutes = require("./src/routes/expenses.routes");
  
 const locationRoutes = require("./src/routes/locationManagement.routes");
+const areaRoutes = require("./src/routes/area.routes");
 const timeslotRoutes = require("./src/routes/timeslot.routes");
  
  
@@ -35,7 +36,8 @@ app.use("/api/service", serviceRoutes);
 app.use("/api/collections", collectionRoutes);
 app.use("/api/timeslot", timeslotRoutes);
 app.use("/api/expenses", require("./src/routes/expenses.routes"));
-app.use("/api/location_management", locationRoutes);
+app.use("/api/location_management/emirates", locationRoutes);
+app.use("/api/areas", areaRoutes);
 
 const PORT = process.env.PORT || 5000;
 

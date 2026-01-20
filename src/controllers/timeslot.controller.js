@@ -8,10 +8,6 @@ exports.createTimeSlot = async(req, res) => {
             status 
         } = req.body;
 
-        // if (!time_slot || time_slot.trim() === "") {
-        //     return res.status(400).json({ success: false, message: "Time slot cannot be empty "});
-        // }
-
         const createTableSQL = `
             CREATE TABLE IF NOT EXISTS timeslot (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -61,11 +57,34 @@ exports.createTimeSlot = async(req, res) => {
 // GET ALL
 exports.getAllTimeSlots = async (req, res) => {
     try {
-        const [rows] = await db.query(
-            `SELECT * FROM timeslot ORDER BY id DESC`
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+         
+        const [[{ total }]] = await db.query(
+            `SELECT COUNT(*) AS total FROM timeslot`
         );
-
-        res.json({ success: true, data: rows });
+        const [rows] = await db.query(
+            `
+            SELECT * 
+            FROM timeslot
+            ORDER BY id DESC
+            LIMIT ? OFFSET ?
+            `,
+            [limit, offset]
+        );
+        const totalPages = Math.ceil(total / limit);
+        res.json({
+            success: true,
+            data: rows,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages,
+                
+            },
+        });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -80,7 +99,8 @@ exports.getTimeSlotById = async (req, res) => {
         const [rows] = await db.query(
             `SELECT * FROM timeslot WHERE id = ?`,
             [id]
-        );  
+        );
+        
 
         if (!rows.length) {
             return res.status(404).json({
@@ -102,20 +122,13 @@ exports.updateTimeSlot = async (req, res) => {
         const { id } = req.params;
         const { time_slot, status } = req.body;
 
-        //  Validation: must provide something to update
+        // Validation: must provide something to update
         if (!time_slot && status === undefined) {
             return res.status(400).json({
                 success: false,
                 message: "No fields to update"
             });
         }
-
-        // if((!time_slot || time_slot.trim() === "") && status === undefined) {
-        //     return res.status(400).json({
-        //         success: false,
-        //         message: "No Valid fields to update"
-        //     });
-        // }
 
         // Run the query FIRST
         const [result] = await db.query(
@@ -126,7 +139,7 @@ exports.updateTimeSlot = async (req, res) => {
             [time_slot, status, id]
         );
 
-       
+        // Check if any row was affected
         if (result.affectedRows === 0) {
             return res.status(404).json({
                 success: false,
