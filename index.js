@@ -18,7 +18,7 @@ const locationRoutes = require("./src/routes/locationManagement.routes");
 const areaRoutes = require("./src/routes/area.routes");
 const timeslotRoutes = require("./src/routes/timeslot.routes");
  
- 
+const serviceLisetRoutes = require("./src/routes/servicelist.routes");
  
  
 
@@ -33,6 +33,8 @@ app.get("/", (req, res) => {
 app.use("/api/employees", employeeRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/service", serviceRoutes);
+app.use("/api/service/list",serviceLisetRoutes);
+app.use("/uploads/services", express.static("uploads/services"));
 app.use("/api/collections", collectionRoutes);
 app.use("/api/timeslot", timeslotRoutes);
 app.use("/api/expenses", require("./src/routes/expenses.routes"));
