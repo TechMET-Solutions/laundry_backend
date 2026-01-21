@@ -85,12 +85,32 @@ exports.createCustomer = async (req, res) => {
 // ✅ GET ALL Customers
 exports.getAllCustomers = async (req, res) => {
     try {
-        const [rows] = await db.query(`SELECT * FROM Customers ORDER BY id DESC`);
-        res.json({ success: true, data: rows });
+        const { search = "" } = req.query;
+
+        let sql = `SELECT * FROM Customers`;
+        let values = [];
+
+        if (search.trim()) {
+            sql += ` WHERE name LIKE ?`;
+            values.push(`%${search}%`);
+        }
+
+        sql += ` ORDER BY id DESC`;
+
+        const [rows] = await db.query(sql, values);
+
+        res.json({
+            success: true,
+            data: rows,
+        });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({
+            success: false,
+            error: err.message,
+        });
     }
 };
+
 
 // ✅ GET Customer BY ID
 exports.getCustomerById = async (req, res) => {
