@@ -19,7 +19,12 @@ const areaRoutes = require("./src/routes/area.routes");
 const timeslotRoutes = require("./src/routes/timeslot.routes");
  
 const serviceLisetRoutes = require("./src/routes/servicelist.routes");
- 
+const serviceTypeRoutes = require("./src/routes/service.routes");
+const serviceCategoryRoutes = require("./src/routes/service.routes");
+const serviceAddonRoutes = require("./src/routes/service.routes");
+const orderRoutes = require("./src/routes/order.routes");
+
+  
  
 
 
@@ -33,13 +38,17 @@ app.get("/", (req, res) => {
 app.use("/api/employees", employeeRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/service", serviceRoutes);
-app.use("/api/service/list",serviceLisetRoutes);
+app.use("/api/service_list", serviceLisetRoutes);
+app.use("/api/service/service_types", serviceTypeRoutes);
+app.use("/api/service/service_categories", serviceCategoryRoutes);
+app.use("/api/service/service_addon", serviceAddonRoutes);
 app.use("/uploads/services", express.static("uploads/services"));
 app.use("/api/collections", collectionRoutes);
 app.use("/api/timeslot", timeslotRoutes);
 app.use("/api/expenses", require("./src/routes/expenses.routes"));
 app.use("/api/location_management/emirates", locationRoutes);
 app.use("/api/areas", areaRoutes);
+app.use("/api/orders", orderRoutes);
 
 const PORT = process.env.PORT || 5000;
 

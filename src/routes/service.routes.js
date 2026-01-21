@@ -20,24 +20,23 @@ const {
 } = require("../controllers/service.controller");
 
 // = = = = =  Service Type Routes = = = = = //
-router.post("/types/create", createServiceType);
-router.get("/types/list", getAllServiceTypes);
-router.get("/types/list/:id", getServiceTypeById);
-router.put("/types/update/:id", updateServiceType);
-router.delete("/types/delete/:id", deleteServiceType);
-
+router.post("/service_types/create", createServiceType);
+router.get("/service_types/list", getAllServiceTypes);
+router.get("/service_types/list/:id", getServiceTypeById);
+router.put("/service_types/update/:id", updateServiceType);
+router.delete("/service_types/delete/:id", deleteServiceType);
 // = = = = =  Service Category Routes = = = = = //
-router.post("/categories/create", createServiceCategory);
-router.get("/categories/list", getAllServiceCategory);
-router.get("/categories/list/:id", getServiceCategoryById);
-router.put("/categories/update/:id", updateServiceCategory);
-router.delete("/categories/delete/:id", deleteServiceCategory);
+router.post("/service_categories/create", createServiceCategory);
+router.get("/service_categories/list", getAllServiceCategory);
+router.get("/service_categories/list/:id", getServiceCategoryById);
+router.put("/service_categories/update/:id", updateServiceCategory);
+router.delete("/service_categories/delete/:id", deleteServiceCategory);
 
 // = = = = =  Service Addon Routes = = = = = //
-router.post("/addon/create", createServiceAddon);
-router.get("/addon/list", getAllServiceaddon);
-router.get("/addon/list/:id", getServiceAddonById);
-router.put("/addon/update/:id", updateServiceaddon);
-router.delete("/addon/delete/:id", deleteServiceAddon);
+router.post("/service_addon/create", createServiceAddon);
+router.get("/service_addon/list", getAllServiceaddon);
+router.get("/service_addon/list/:id", getServiceAddonById);
+router.put("/service_addon/update/:id", updateServiceaddon);
+router.delete("/service_addon/delete/:id", deleteServiceAddon);
 
 module.exports = router;

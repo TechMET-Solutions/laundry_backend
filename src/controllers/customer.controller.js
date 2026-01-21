@@ -112,6 +112,40 @@ exports.getAllCustomers = async (req, res) => {
 };
 
 
+//  try {
+//     const page = parseInt(req.query.page) || 1;
+//     const limit = parseInt(req.query.limit) || 10;
+//     const offset = (page - 1) * limit;
+
+//     const [[{ total }]] = await db.query(
+//       "SELECT COUNT(*) AS total FROM customers"
+//     );
+
+//     const [rows] = await db.query(
+//       `
+//       SELECT *
+//       FROM customers
+//       ORDER BY id DESC
+//       LIMIT ? OFFSET ?
+//       `,
+//       [limit, offset]
+//     );
+
+//     res.json({
+//       success: true,
+//       data: rows,
+//         pagination: {
+//         total,
+//         page,
+//         limit,
+//         totalPages: Math.ceil(total / limit),
+//         },
+//     });
+//     } catch (err) {
+//     res.status(500).json({ success: false, error: err.message });
+//     }
+
+
 // ✅ GET Customer BY ID
 exports.getCustomerById = async (req, res) => {
     try {
