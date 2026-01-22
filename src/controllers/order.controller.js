@@ -1,21 +1,8 @@
 const db = require("../../config/database");
 
-const ALLOWED_STATUSES = new Set([
-  "RECEIVED",
-  "PENDING",
-  "DELIVERED",
-  "PROCESSING",
-  "OUT_FOR_DELIVERY",
-]);
+ 
 
-const normalizeStatus = (value) => {
-  if (!value) return "PENDING";
-  const normalized = value.toString().trim().toUpperCase().replace(/\s+/g, "_");
-  if (!ALLOWED_STATUSES.has(normalized)) {
-    return null;
-  }
-  return normalized;
-};
+ 
 
 // CREATE Order (auto-creates table + sequential code)
 exports.createOrder = async (req, res) => {
@@ -32,7 +19,7 @@ exports.createOrder = async (req, res) => {
       status,
     } = req.body;
 
-    const dbStatus = normalizeStatus(status);
+    
 
     if (!orderDate || !deliveryDate || !customerName || !driverName || totalAmount === undefined) {
       return res.status(400).json({
@@ -41,12 +28,7 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    if (!dbStatus) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid status. Allowed: RECEIVED, PENDING, DELIVERED, PROCESSING, OUT_FOR_DELIVERY",
-      });
-    }
+     
 
     const createTableSQL = `
 			CREATE TABLE IF NOT EXISTS orders (
@@ -60,7 +42,7 @@ exports.createOrder = async (req, res) => {
 				total_amount DECIMAL(10,2) NOT NULL,
 				paid_amount DECIMAL(10,2) DEFAULT 0,
 				currency VARCHAR(10) NOT NULL DEFAULT 'AED',
-				status ENUM('RECEIVED','PENDING','DELIVERED','PROCESSING','OUT_FOR_DELIVERY') NOT NULL DEFAULT 'PENDING',
+				status ENUM('RECEIVED','PENDING','DELIVERED','PROCESSING','OUT_FOR_DELIVERY','DELETED') NOT NULL DEFAULT 'PENDING',
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 			)
 		`;
@@ -106,7 +88,7 @@ exports.createOrder = async (req, res) => {
       totalAmount,
       paidAmount,
       currency,
-      dbStatus,
+      status,
     ]);
 
     res.status(201).json({
@@ -123,7 +105,7 @@ exports.createOrder = async (req, res) => {
         totalAmount,
         paidAmount,
         currency,
-        status: dbStatus,
+        status 
       },
     });
   } catch (err) {
@@ -143,7 +125,7 @@ exports.getOrders = async (req, res) => {
     );
 
     const [rows] = await db.query(
-      `SELECT * FROM orders ORDER BY id DESC LIMIT ? OFFSET ?`,
+      `SELECT * FROM orders WHERE status != 'DELETED' ORDER BY id ASC LIMIT ? OFFSET ?`,
       [limit, offset]
     );
 
@@ -182,51 +164,45 @@ exports.getOrderById = async (req, res) => {
 exports.updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Accept snake_case too
     const {
-      orderDate,
-      deliveryDate,
-      customerName,
-      driverName,
+      order_date,
+      delivery_date,
+      customer_name,
+      driver_name,
       amount,
-      totalAmount,
-      paidAmount,
+      total_amount,
+      paid_amount,
       currency,
       status,
     } = req.body;
 
-    const dbStatus = status ? normalizeStatus(status) : null;
-    if (status && !dbStatus) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid status. Allowed: RECEIVED, PENDING, DELIVERED, PROCESSING, OUT_FOR_DELIVERY",
-      });
-    }
-
     const updateSQL = `
-			UPDATE orders
-			SET
-				order_date = COALESCE(?, order_date),
-				delivery_date = COALESCE(?, delivery_date),
-				customer_name = COALESCE(?, customer_name),
-				driver_name = COALESCE(?, driver_name),
-				amount = COALESCE(?, amount),
-				total_amount = COALESCE(?, total_amount),
-				paid_amount = COALESCE(?, paid_amount),
-				currency = COALESCE(?, currency),
-				status = COALESCE(?, status)
-			WHERE id = ?
-		`;
+      UPDATE orders
+      SET
+        order_date = COALESCE(?, order_date),
+        delivery_date = COALESCE(?, delivery_date),
+        customer_name = COALESCE(?, customer_name),
+        driver_name = COALESCE(?, driver_name),
+        amount = COALESCE(?, amount),
+        total_amount = COALESCE(?, total_amount),
+        paid_amount = COALESCE(?, paid_amount),
+        currency = COALESCE(?, currency),
+        status = COALESCE(?, status)
+      WHERE id = ?
+    `;
 
     const [result] = await db.query(updateSQL, [
-      orderDate || null,
-      deliveryDate || null,
-      customerName || null,
-      driverName || null,
+      order_date || null,
+      delivery_date || null,
+      customer_name || null,
+      driver_name || null,
       amount ?? null,
-      totalAmount ?? null,
-      paidAmount ?? null,
+      total_amount ?? null,
+      paid_amount ?? null,
       currency || null,
-      dbStatus || null,
+      status || null,
       id,
     ]);
 
@@ -239,6 +215,7 @@ exports.updateOrder = async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
+
 
 // DELETE order
 exports.deleteOrder = async (req, res) => {
