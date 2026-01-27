@@ -32,8 +32,8 @@ app.get("/", (req, res) => {
     res.send("✅ Laundry POS System Backend Server Running...");
 });
 
-// app.use("/assets", express.static(path.join(__dirname, "src/assets")));
-// app.use("/uploads", express.static(path.join(__dirname, "./uploads")));
+// Image Path
+app.use('/uploads', express.static('uploads'));
 
 app.use("/api/employees", employeeRoutes);
 app.use("/api/customers", customerRoutes);
@@ -42,7 +42,6 @@ app.use("/api/service_list", serviceLisetRoutes);
 app.use("/api/service/service_types", serviceTypeRoutes);
 app.use("/api/service/service_categories", serviceCategoryRoutes);
 app.use("/api/service/service_addon", serviceAddonRoutes);
-app.use("/uploads/services", express.static("uploads/services"));
 app.use("/api/collections", collectionRoutes);
 app.use("/api/timeslot", timeslotRoutes);
 app.use("/api/expenses", require("./src/routes/expenses.routes"));
