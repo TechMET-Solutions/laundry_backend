@@ -3,12 +3,18 @@ const db = require("../../config/database");
 // CREATE Service Type (AUTO CREATE TABLE + INSERT)
 exports.createServiceType = async (req, res) => {
     try {
-        const { name, abbreviation, status = 1 } = req.body;
+        console.log("Request body:", req.body);
+        console.log("Request file:", req.file);
 
-        if (!name || !abbreviation) {
+        const { name, abbreviation, status = 1 } = req.body;
+        const icon = req.file ? req.file.filename : null;
+        const normalizedStatus = Number.isNaN(Number(status)) ? 1 : Number(status);
+
+        if (!name || !abbreviation || !icon) {
+            console.warn("Validation failed - name:", name, "abbreviation:", abbreviation, "icon:", icon);
             return res.status(400).json({
                 success: false,
-                message: "Name and abbreviation are required",
+                message: "Name, abbreviation, and icon are required",
             });
         }
 
@@ -18,6 +24,7 @@ exports.createServiceType = async (req, res) => {
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
         abbreviation VARCHAR(100) NOT NULL,
+        icon VARCHAR(255) NOT NULL,
         status TINYINT(1) DEFAULT 1, -- 0 = inactive, 1 = active
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -27,14 +34,15 @@ exports.createServiceType = async (req, res) => {
 
         // Insert Service Type
         const insertSQL = `
-      INSERT INTO service_type (name, abbreviation, status)
-      VALUES (?, ?, ?)
+      INSERT INTO service_type (name, abbreviation, icon, status)
+      VALUES (?, ?, ?, ?)
     `;
 
         const [result] = await db.query(insertSQL, [
             name.trim(),
             abbreviation.trim(),
-            status,
+            icon,
+            normalizedStatus,
         ]);
 
         res.status(201).json({
@@ -44,10 +52,12 @@ exports.createServiceType = async (req, res) => {
                 id: result.insertId,
                 name,
                 abbreviation,
-                status,
+                icon,
+                status: normalizedStatus,
             },
         });
     } catch (err) {
+        console.error("createServiceType error:", err);
         res.status(500).json({
             success: false,
             error: err.message,
@@ -62,6 +72,7 @@ exports.updateServiceType = async (req, res) => {
     try {
         const { id } = req.params;
         const { name, abbreviation, status } = req.body;
+        const icon = req.file ? req.file.filename : null;
 
         if (!id) {
             return res.status(400).json({
@@ -75,6 +86,7 @@ exports.updateServiceType = async (req, res) => {
       SET 
         name = COALESCE(?, name),
         abbreviation = COALESCE(?, abbreviation),
+        icon = COALESCE(?, icon),
         status = COALESCE(?, status)
       WHERE id = ?
     `;
@@ -82,6 +94,7 @@ exports.updateServiceType = async (req, res) => {
         const [result] = await db.query(updateSQL, [
             name?.trim() || null,
             abbreviation?.trim() || null,
+            icon || null,
             status ?? null,
             id,
         ]);
@@ -98,6 +111,7 @@ exports.updateServiceType = async (req, res) => {
             message: "Service Type updated successfully",
         });
     } catch (err) {
+        console.error("updateServiceType error:", err);
         res.status(500).json({
             success: false,
             error: err.message,

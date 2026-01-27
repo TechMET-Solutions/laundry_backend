@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const upload = require("../../config/multer");
 
 const {
     createServiceType,
@@ -19,11 +20,24 @@ const {
     deleteServiceAddon,
 } = require("../controllers/service.controller");
 
+// Multer error handler middleware
+const handleMulterError = (err, req, res, next) => {
+    if (err instanceof require('multer').MulterError) {
+        console.error("Multer error:", err);
+        return res.status(400).json({
+            success: false,
+            message: `File upload error: ${err.message}. Expected field name: 'icon'`,
+            error: err.message
+        });
+    }
+    next(err);
+};
+
 // = = = = =  Service Type Routes = = = = = //
-router.post("/service_types/create", createServiceType);
+router.post("/service_types/create", upload.single("icon"), createServiceType);
 router.get("/service_types/list", getAllServiceTypes);
 router.get("/service_types/list/:id", getServiceTypeById);
-router.put("/service_types/update/:id", updateServiceType);
+router.put("/service_types/update/:id", upload.single("icon"), updateServiceType);
 router.delete("/service_types/delete/:id", deleteServiceType);
 // = = = = =  Service Category Routes = = = = = //
 router.post("/service_categories/create", createServiceCategory);
