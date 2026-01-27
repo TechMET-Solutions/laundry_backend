@@ -5,27 +5,21 @@ const fs = require("fs");
 // 👉 Dynamic storage configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    let uploadFolder = "services"; // default
+    // Check path or originalUrl to decide folder
+    const isServiceType = req.originalUrl.includes("service_types");
+    const folderName = isServiceType ? "servicesTypes" : "services";
 
-    if (req.baseUrl.includes("/service_types")) {
-      uploadFolder = "servicesTypes";
-    } else if (req.baseUrl.includes("/service_list")) {
-      uploadFolder = "services";
-    }
+    const uploadPath = path.join(__dirname, "..", "uploads", folderName);
 
-    const uploadPath = path.join(__dirname, "..", "uploads", uploadFolder);
-
-    // Auto-create folder if missing
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
-
     cb(null, uploadPath);
   },
-
   filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${file.originalname}`;
-    cb(null, uniqueName);
+    // Remove spaces from filenames to prevent URL issues
+    const cleanFileName = file.originalname.replace(/\s+/g, '-');
+    cb(null, `${Date.now()}-${cleanFileName}`);
   },
 });
 

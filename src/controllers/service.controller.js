@@ -1,48 +1,59 @@
 const db = require("../../config/database");
+const fs = require('fs').promises; // Use promises for cleaner async/await
+const path = require('path');
+
+const deleteFile = async (relativePath) => {
+    if (!relativePath) return;
+    try {
+        // Adjusting path: assumes this controller is in /controllers/subfolder/
+        const fullPath = path.join(__dirname, '..', '..', relativePath);
+        await fs.unlink(fullPath);
+    } catch (err) {
+        console.error(`File deletion failed or file not found: ${relativePath}`);
+    }
+};
 
 // CREATE Service Type (AUTO CREATE TABLE + INSERT)
 exports.createServiceType = async (req, res) => {
     try {
-        console.log("Request body:", req.body);
-        console.log("Request file:", req.file);
+        // Added 'image' to destructuring
+        const { name, abbreviation, image, status = 1 } = req.body;
 
-        const { name, abbreviation, status = 1 } = req.body;
-        const icon = req.file ? req.file.filename : null;
-        const normalizedStatus = Number.isNaN(Number(status)) ? 1 : Number(status);
-
-        if (!name || !abbreviation || !icon) {
-            console.warn("Validation failed - name:", name, "abbreviation:", abbreviation, "icon:", icon);
+        if (!name || !abbreviation) {
             return res.status(400).json({
                 success: false,
-                message: "Name, abbreviation, and icon are required",
+                message: "Name and abbreviation are required",
             });
         }
 
-        // Auto-create table
+        // 1. Auto-create/Update table (Added image column)
         const createTableSQL = `
-      CREATE TABLE IF NOT EXISTS service_type (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        abbreviation VARCHAR(100) NOT NULL,
-        icon VARCHAR(255) NOT NULL,
-        status TINYINT(1) DEFAULT 1, -- 0 = inactive, 1 = active
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `;
+            CREATE TABLE IF NOT EXISTS service_type (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                abbreviation VARCHAR(100) NOT NULL,
+                image VARCHAR(255) DEFAULT NULL, -- Added image field
+                status TINYINT(1) DEFAULT 1,
+                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
 
         await db.query(createTableSQL);
 
-        // Insert Service Type
+        // 2. Insert Service Type (Updated to include image)
         const insertSQL = `
-      INSERT INTO service_type (name, abbreviation, icon, status)
-      VALUES (?, ?, ?, ?)
-    `;
+            INSERT INTO service_type (name, abbreviation, image, status)
+            VALUES (?, ?, ?, ?)
+        `;
+
+        // Inside createServiceType
+        const imagePath = req.file ? `uploads/servicesTypes/${req.file.filename}` : null;
 
         const [result] = await db.query(insertSQL, [
             name.trim(),
             abbreviation.trim(),
-            icon,
-            normalizedStatus,
+            imagePath, // Save the generated path
+            status,
         ]);
 
         res.status(201).json({
@@ -52,19 +63,17 @@ exports.createServiceType = async (req, res) => {
                 id: result.insertId,
                 name,
                 abbreviation,
-                icon,
-                status: normalizedStatus,
+                image,
+                status,
             },
         });
     } catch (err) {
-        console.error("createServiceType error:", err);
         res.status(500).json({
             success: false,
             error: err.message,
         });
     }
 };
-
 
 
 // UPDATE Service Type
@@ -72,86 +81,46 @@ exports.updateServiceType = async (req, res) => {
     try {
         const { id } = req.params;
         const { name, abbreviation, status } = req.body;
-        const icon = req.file ? req.file.filename : null;
+        let imagePath = req.file ? `uploads/servicesTypes/${req.file.filename}` : undefined;
 
-        if (!id) {
-            return res.status(400).json({
-                success: false,
-                message: "Service Type ID is required",
-            });
+        if (imagePath) {
+            const [rows] = await db.query(`SELECT image FROM service_type WHERE id = ?`, [id]);
+            if (rows.length > 0) await deleteFile(rows[0].image);
         }
 
         const updateSQL = `
-      UPDATE service_type
-      SET 
-        name = COALESCE(?, name),
-        abbreviation = COALESCE(?, abbreviation),
-        icon = COALESCE(?, icon),
-        status = COALESCE(?, status)
-      WHERE id = ?
-    `;
+            UPDATE service_type SET 
+            name = COALESCE(?, name), 
+            abbreviation = COALESCE(?, abbreviation), 
+            image = COALESCE(?, image), 
+            status = COALESCE(?, status) 
+            WHERE id = ?`;
 
-        const [result] = await db.query(updateSQL, [
-            name?.trim() || null,
-            abbreviation?.trim() || null,
-            icon || null,
-            status ?? null,
-            id,
-        ]);
+        const [result] = await db.query(updateSQL, [name?.trim() || null, abbreviation?.trim() || null, imagePath || null, status ?? null, id]);
+        if (result.affectedRows === 0) return res.status(404).json({ success: false, message: "Not found" });
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({
-                success: false,
-                message: "Service Type not found",
-            });
-        }
-
-        res.json({
-            success: true,
-            message: "Service Type updated successfully",
-        });
+        res.json({ success: true, message: "Updated successfully" });
     } catch (err) {
-        console.error("updateServiceType error:", err);
-        res.status(500).json({
-            success: false,
-            error: err.message,
-        });
+        res.status(500).json({ success: false, error: err.message });
     }
 };
+
 
 // DELETE Service Type
 exports.deleteServiceType = async (req, res) => {
     try {
         const { id } = req.params;
+        const [rows] = await db.query(`SELECT image FROM service_type WHERE id = ?`, [id]);
+        if (rows.length === 0) return res.status(404).json({ success: false, message: "Not found" });
 
-        if (!id) {
-            return res.status(400).json({
-                success: false,
-                message: "Service Type ID is required",
-            });
-        }
+        await deleteFile(rows[0].image);
+        await db.query(`DELETE FROM service_type WHERE id = ?`, [id]);
 
-        const deleteSQL = `DELETE FROM service_type WHERE id = ?`;
-        const [result] = await db.query(deleteSQL, [id]);
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({
-                success: false,
-                message: "Service Type not found",
-            });
-        }
-
-        res.json({
-            success: true,
-            message: "Service Type deleted successfully",
-        });
+        res.json({ success: true, message: "Deleted successfully" });
     } catch (err) {
-        res.status(500).json({
-            success: false,
-            error: err.message,
-        });
+        res.status(500).json({ success: false, error: err.message });
     }
-};
+}
 
 
 // GET All Service Types
