@@ -139,6 +139,22 @@ exports.updateServiceList = async (req, res) => {
 // GET Service List
 exports.getServiceList = async (req, res) => {
     try {
+        // Create table if not exists
+        const createTableSQL = `
+            CREATE TABLE IF NOT EXISTS services (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                addIcon VARCHAR(255) NOT NULL,
+                category VARCHAR(100) NOT NULL,
+                sorting_order INT DEFAULT 0,
+                sqf_status TINYINT(1) DEFAULT 0,
+                service_types JSON NOT NULL,
+                status TINYINT(1) DEFAULT 1,
+                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+        await db.query(createTableSQL);
+
         // Query results sorted by ID
         const [rows] = await db.query("SELECT * FROM services ORDER BY id ASC");
 

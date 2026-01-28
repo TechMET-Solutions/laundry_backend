@@ -377,7 +377,7 @@ exports.getServiceCategoryById = async (req, res) => {
 
 exports.createServiceAddon = async (req, res) => {
     try {
-        const { name, price, status = 1 } = req.body;
+        const { name, price, addonMessage, status = 1 } = req.body;
 
         if (!name || !price) {
             return res.status(400).json({
@@ -392,6 +392,7 @@ exports.createServiceAddon = async (req, res) => {
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
         price DOUBLE(10, 2) NOT NULL,
+        addonMessage VARCHAR(100) DEFAULT NULL,
         status TINYINT(1) DEFAULT 1, -- 0 = inactive, 1 = active
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -401,13 +402,14 @@ exports.createServiceAddon = async (req, res) => {
 
         // Insert Service Addon
         const insertSQL = `
-      INSERT INTO service_addon (name, price, status)
-      VALUES (?, ?, ?)
+      INSERT INTO service_addon (name, price, addonMessage, status)
+      VALUES (?, ?, ?, ?)
     `;
 
         const [result] = await db.query(insertSQL, [
             name.trim(),
             price.trim(),
+            addonMessage?.trim() || null,
             status,
         ]);
 
@@ -418,6 +420,7 @@ exports.createServiceAddon = async (req, res) => {
                 id: result.insertId,
                 name,
                 price,
+                addonMessage,
                 status,
             },
         });
@@ -433,6 +436,19 @@ exports.createServiceAddon = async (req, res) => {
 // GET All Service addon
 exports.getAllServiceaddon = async (req, res) => {
     try {
+        // Ensure table exists first
+        const createTableSQL = `
+            CREATE TABLE IF NOT EXISTS service_addon (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                price DOUBLE(10, 2) NOT NULL,
+                addonMessage VARCHAR(100) DEFAULT NULL,
+                status TINYINT(1) DEFAULT 1,
+                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+        await db.query(createTableSQL);
+
         const [rows] = await db.query(`SELECT * FROM service_addon ORDER BY id DESC`);
 
         res.json({
@@ -440,6 +456,7 @@ exports.getAllServiceaddon = async (req, res) => {
             data: rows,
         });
     } catch (err) {
+        console.error("getAllServiceaddon error:", err);
         res.status(500).json({
             success: false,
             error: err.message,
@@ -487,7 +504,7 @@ exports.getServiceAddonById = async (req, res) => {
 exports.updateServiceaddon = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, price, status } = req.body;
+        const { name, price, addonMessage, status } = req.body;
 
         if (!id) {
             return res.status(400).json({
@@ -501,6 +518,7 @@ exports.updateServiceaddon = async (req, res) => {
       SET 
         name = COALESCE(?, name),
         price = COALESCE(?, price),
+        addonMessage = COALESCE(?, addonMessage),
         status = COALESCE(?, status)
       WHERE id = ?
     `;
@@ -508,6 +526,7 @@ exports.updateServiceaddon = async (req, res) => {
         const [result] = await db.query(updateSQL, [
             name?.trim() || null,
             price?.trim() || null,
+            addonMessage?.trim() || null,
             status ?? null,
             id,
         ]);
