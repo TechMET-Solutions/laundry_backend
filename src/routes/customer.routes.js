@@ -7,6 +7,7 @@ const {
     getCustomerById,
     updateCustomer,
     deleteCustomer,
+    exportExcelFile,
 } = require("../controllers/customer.controller");
 
 // CREATE
@@ -23,5 +24,8 @@ router.put("/update/:id", updateCustomer);
 
 // DELETE
 router.delete("/delete/:id", deleteCustomer);
+
+// EXPORT EXCEL FILE
+router.get("/export-customers", exportExcelFile);
 
 module.exports = router;

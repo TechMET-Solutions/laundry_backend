@@ -1,4 +1,6 @@
 const db = require("../../config/database");
+const ExcelJS = require("exceljs");
+
 
 // ✅ CREATE Customer (AUTO CREATE TABLE + INSERT)
 exports.createCustomer = async (req, res) => {
@@ -112,40 +114,6 @@ exports.getAllCustomers = async (req, res) => {
 };
 
 
-//  try {
-//     const page = parseInt(req.query.page) || 1;
-//     const limit = parseInt(req.query.limit) || 10;
-//     const offset = (page - 1) * limit;
-
-//     const [[{ total }]] = await db.query(
-//       "SELECT COUNT(*) AS total FROM customers"
-//     );
-
-//     const [rows] = await db.query(
-//       `
-//       SELECT *
-//       FROM customers
-//       ORDER BY id DESC
-//       LIMIT ? OFFSET ?
-//       `,
-//       [limit, offset]
-//     );
-
-//     res.json({
-//       success: true,
-//       data: rows,
-//         pagination: {
-//         total,
-//         page,
-//         limit,
-//         totalPages: Math.ceil(total / limit),
-//         },
-//     });
-//     } catch (err) {
-//     res.status(500).json({ success: false, error: err.message });
-//     }
-
-
 // ✅ GET Customer BY ID
 exports.getCustomerById = async (req, res) => {
     try {
@@ -249,5 +217,55 @@ exports.deleteCustomer = async (req, res) => {
         res.json({ success: true, message: "Customer deleted successfully" });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+
+
+exports.exportExcelFile = async (req, res) => {
+    try {
+        const [customers] = await db.query("SELECT * FROM Customers ORDER BY id DESC");
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("Customers");
+
+        worksheet.columns = [
+            { header: "ID", key: "id", width: 10 },
+            { header: "Name", key: "name", width: 25 },
+            { header: "Type", key: "type", width: 15 },
+            { header: "Mobile No", key: "mobile_no", width: 20 },
+            { header: "WhatsApp No", key: "whatsapp_no", width: 20 },
+            { header: "Email", key: "email", width: 30 },
+            { header: "Emirates", key: "emirates", width: 20 },
+            { header: "Area", key: "area", width: 20 },
+            { header: "Apartment No", key: "apartment_number", width: 20 },
+            { header: "Building Name", key: "building_name", width: 25 },
+            { header: "Map Location", key: "map_location", width: 25 },
+            { header: "Tax Number", key: "tax_number", width: 20 },
+            { header: "Address", key: "address", width: 30 },
+            { header: "Status", key: "status", width: 10 },
+            { header: "Created At", key: "createdAt", width: 25 },
+        ];
+
+        customers.forEach((customer) => {
+            worksheet.addRow(customer);
+        });
+
+        res.setHeader(
+            "Content-Type",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
+        res.setHeader(
+            "Content-Disposition",
+            "attachment; filename=customers.xlsx"
+        );
+
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            error: err.message,
+        });
     }
 };
