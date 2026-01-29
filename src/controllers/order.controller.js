@@ -18,6 +18,7 @@ exports.createOrder = async (req, res) => {
       paidAmount = 0,
       currency = "AED",
       status,
+      allItems
     } = req.body;
 
 
@@ -38,12 +39,13 @@ exports.createOrder = async (req, res) => {
 				order_date DATE NOT NULL,
 				delivery_date DATE NOT NULL,
 				customer_name VARCHAR(150) NOT NULL,
-				driver_name VARCHAR(150) NOT NULL,
+				driver_name VARCHAR(150) NOT NULL, 
 				amount DECIMAL(10,2) DEFAULT 0,
 				total_amount DECIMAL(10,2) NOT NULL,
 				paid_amount DECIMAL(10,2) DEFAULT 0,
 				currency VARCHAR(10) NOT NULL DEFAULT 'AED',
 				status ENUM('RECEIVED','PENDING','DELIVERED','PROCESSING','DELETED','OUT_FOR_DELIVERY') NOT NULL DEFAULT 'PENDING',
+        all_items JSON NOT NULL,
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 			)
 		`;
@@ -70,13 +72,14 @@ exports.createOrder = async (req, res) => {
 				order_date,
 				delivery_date,
 				customer_name,
-				driver_name,
+				driver_name, 
 				amount,
 				total_amount,
 				paid_amount,
 				currency,
-				status
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				status,
+        all_items
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`;
 
     const [result] = await db.query(insertSQL, [
@@ -90,6 +93,7 @@ exports.createOrder = async (req, res) => {
       paidAmount,
       currency,
       status,
+      JSON.stringify(allItems)
     ]);
 
     res.status(201).json({
@@ -106,7 +110,8 @@ exports.createOrder = async (req, res) => {
         totalAmount,
         paidAmount,
         currency,
-        status
+        status,
+        allItems
       },
     });
   } catch (err) {
@@ -117,6 +122,26 @@ exports.createOrder = async (req, res) => {
 // GET paginated orders
 exports.getOrders = async (req, res) => {
   try {
+    // Create table if not exists
+    const createTableSQL = `
+			CREATE TABLE IF NOT EXISTS orders (
+				id INT AUTO_INCREMENT PRIMARY KEY,
+				order_code VARCHAR(30) NOT NULL UNIQUE,
+				order_date DATE NOT NULL,
+				delivery_date DATE NOT NULL,
+				customer_name VARCHAR(150) NOT NULL,
+				driver_name VARCHAR(150) NOT NULL, 
+				amount DECIMAL(10,2) DEFAULT 0,
+				total_amount DECIMAL(10,2) NOT NULL,
+				paid_amount DECIMAL(10,2) DEFAULT 0,
+				currency VARCHAR(10) NOT NULL DEFAULT 'AED',
+				status ENUM('RECEIVED','PENDING','DELIVERED','PROCESSING','DELETED','OUT_FOR_DELIVERY') NOT NULL DEFAULT 'PENDING',
+        all_items VARCHAR(5000),
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			)
+		`;
+    await db.query(createTableSQL);
+
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const offset = (page - 1) * limit;
@@ -130,6 +155,11 @@ exports.getOrders = async (req, res) => {
       [limit, offset]
     );
 
+    //  JSON parse here
+    rows.forEach(row => {
+      if (row.all_items) row.all_items = JSON.parse(row.all_items);
+    });
+
     res.json({
       success: true,
       data: rows,
@@ -141,6 +171,7 @@ exports.getOrders = async (req, res) => {
       },
     });
   } catch (err) {
+    console.error("getOrders error:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 };
