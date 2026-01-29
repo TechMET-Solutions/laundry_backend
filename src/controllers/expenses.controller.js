@@ -154,25 +154,24 @@ exports.deleteExpenses = async (req, res) => {
 exports.createExpenseCategory=async(req,res)=>{
     
     try{
-        const{category_name,description}=req.body;
+        const{expense_category, status, created_by}=req.body;
         const createTableSQL=`
         create table if not exists expense_categories(
-            id int auto_increment primary key,
-            category_name varchar(100) not null,
-            description varchar(255),
-            createdAt timestamp default current_timestamp
-        )
-        `;
+    id int auto_increment primary key,
+    expense_category varchar(100) not null,
+    status varchar(255) not null,
+    created_by varchar(100) not null
+    )
+    `;
         await db.query(createTableSQL);
-        const insertSQL=`
-        insert into expense_categories
-        (
-            category_name,
-            description
-        )
-        values(?,?)
+        const insertSQL = `
+        INSERT INTO expense_categories
+        (expense_category, status, created_by)
+        VALUES (?, ?, ?)
         `;
-        const [result]=await db.query(insertSQL,[category_name,description]);
+        const [result]=await db.query(insertSQL,[ expense_category,
+            status,
+            created_by]);
         res.status(201).json({success:true,message:"Expense category created successfully",id:result.insertId});    
     }catch(err){
         res.status(500).json({success:false,error:err.message});
@@ -202,7 +201,7 @@ exports.getExpenseCategoryById=async(req,res)=>{
         if(!rows.length){
             return res.status(404).json({success:false,message:"Expense category not found"});
         }
-        res.status(400).json({succes:true,data:rows[0]});
+        res.status(200).json({success:true,data:rows[0]});
     }
     catch(err){
         res.status(500).json({success:false,error:err.message});
@@ -231,20 +230,19 @@ exports.deleteExpenseCategory = async (req, res) => {
 exports.updateExpenseCategory = async (req, res) => {
     try {
         const { id } = req.params;  
-        const {
-            category_name,
-            description
-        } = req.body;  
-        const updateSQL=`
-        update expense_categories set
-        category_name=?,
-        description=?
-        where id=?
+       const { expense_category, status, created_by } = req.body; 
+         const updateSQL = `
+        UPDATE expense_categories SET
+        expense_category = ?,
+        status = ?,
+        created_by = ?
+        WHERE id = ?
         `;
 
         const [result] = await db.query(updateSQL,[
-            category_name,
-            description,
+             expense_category,
+            status,
+            created_by,
             id
         ]); 
 
@@ -258,5 +256,3 @@ exports.updateExpenseCategory = async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 };
-
-
