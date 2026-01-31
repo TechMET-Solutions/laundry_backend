@@ -57,6 +57,22 @@ exports.createArea = async (req, res) => {
 // ==================== GET ALL AREAS ====================
 exports.getAllAreas = async (req, res) => {
   try {
+
+ const createTableSQL = `
+      CREATE TABLE IF NOT EXISTS areas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        area VARCHAR(100) NOT NULL,
+        emirates VARCHAR(100) NOT NULL,
+        radius VARCHAR(50) NOT NULL,
+        country VARCHAR(100) NOT NULL,
+        status TINYINT(1) DEFAULT 1,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          ON UPDATE CURRENT_TIMESTAMP
+      )
+    `;
+    await db.query(createTableSQL);
+
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;

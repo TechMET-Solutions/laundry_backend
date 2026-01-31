@@ -1,36 +1,34 @@
 const db = require("../../config/database");
 
-
-
-
-
-
 // CREATE Order (auto-creates table + sequential code)
 exports.createOrder = async (req, res) => {
   try {
     const {
+      addon,
       orderDate,
       deliveryDate,
       customerName,
+      customerId,
+      driverId,
       driverName,
-      amount = 0,
-      totalAmount,
+      subTotal = 0,
+      grossTotal,
       paidAmount = 0,
-      currency = "AED",
-      status,
-      allItems
+      pendingAmount = 0,
+      discount = 0,
+      tax = 0,
+      paymentMethod,
+      status = "Pending",
+      remark = "",
+      itemList
     } = req.body;
 
-
-
-    if (!orderDate || !deliveryDate || !customerName || !driverName || totalAmount === undefined) {
+    if (!orderDate || !deliveryDate || !customerName || !driverId || !driverName || grossTotal === undefined) {
       return res.status(400).json({
         success: false,
-        message: "orderDate, deliveryDate, customerName, driverName, totalAmount are required",
+        message: "orderDate, deliveryDate, customerName, customerId, driverId, driverName, grossTotal and itemList are required",
       });
     }
-
-
 
     const createTableSQL = `
 			CREATE TABLE IF NOT EXISTS orders (
@@ -38,14 +36,21 @@ exports.createOrder = async (req, res) => {
 				order_code VARCHAR(30) NOT NULL UNIQUE,
 				order_date DATE NOT NULL,
 				delivery_date DATE NOT NULL,
+				customer_id INT NOT NULL,
 				customer_name VARCHAR(150) NOT NULL,
-				driver_name VARCHAR(150) NOT NULL, 
-				amount DECIMAL(10,2) DEFAULT 0,
-				total_amount DECIMAL(10,2) NOT NULL,
+				driver_id INT NOT NULL,
+				driver_name VARCHAR(150) NOT NULL,
+				sub_total DECIMAL(10,2) DEFAULT 0,
+				gross_total DECIMAL(10,2) NOT NULL,
 				paid_amount DECIMAL(10,2) DEFAULT 0,
-				currency VARCHAR(10) NOT NULL DEFAULT 'AED',
-				status ENUM('RECEIVED','PENDING','DELIVERED','PROCESSING','DELETED','OUT_FOR_DELIVERY') NOT NULL DEFAULT 'PENDING',
-        all_items JSON NOT NULL,
+        pending_amount DECIMAL(10,2) DEFAULT 0,
+				discount DECIMAL(10,2) DEFAULT 0,
+				tax DECIMAL(10,2) DEFAULT 0,
+				payment_method VARCHAR(50),
+				status ENUM('Pending','Processing','Delivered','Cancelled') NOT NULL DEFAULT 'Pending',
+				remark TEXT,
+        addon JSON,
+        item_list JSON NOT NULL,
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 			)
 		`;
@@ -64,54 +69,75 @@ exports.createOrder = async (req, res) => {
       }
     }
 
-    const orderCode = `TMS/ORD-${String(nextNumber).padStart(2, "0")}`;
+    const orderCode = `TMS/ORD-${String(nextNumber).padStart(3, "0")}`;
 
     const insertSQL = `
 			INSERT INTO orders (
 				order_code,
 				order_date,
 				delivery_date,
+				customer_id,
 				customer_name,
-				driver_name, 
-				amount,
-				total_amount,
+				driver_id,
+				driver_name,
+				sub_total,
+				gross_total,
 				paid_amount,
-				currency,
+        pending_amount,
+				discount,
+				tax,
+				payment_method,
 				status,
-        all_items
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				remark,
+        addon,
+        item_list
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`;
 
     const [result] = await db.query(insertSQL, [
       orderCode,
       orderDate,
       deliveryDate,
+      customerId,
       customerName,
+      driverId,
       driverName,
-      amount,
-      totalAmount,
+      subTotal,
+      grossTotal,
       paidAmount,
-      currency,
+      pendingAmount,
+      discount,
+      tax,
+      paymentMethod,
       status,
-      JSON.stringify(allItems)
+      remark,
+      JSON.stringify(addon),
+      JSON.stringify(itemList)
     ]);
 
     res.status(201).json({
       success: true,
-      message: "Order created",
+      message: "Order created successfully",
       data: {
         id: result.insertId,
         orderCode,
         orderDate,
         deliveryDate,
+        customerId,
         customerName,
+        driverId,
         driverName,
-        amount,
-        totalAmount,
+        subTotal,
+        grossTotal,
         paidAmount,
-        currency,
+        pendingAmount,
+        discount,
+        tax,
+        paymentMethod,
         status,
-        allItems
+        remark,
+        addon,
+        itemList
       },
     });
   } catch (err) {
@@ -129,14 +155,21 @@ exports.getOrders = async (req, res) => {
 				order_code VARCHAR(30) NOT NULL UNIQUE,
 				order_date DATE NOT NULL,
 				delivery_date DATE NOT NULL,
+				customer_id INT NOT NULL,
 				customer_name VARCHAR(150) NOT NULL,
-				driver_name VARCHAR(150) NOT NULL, 
-				amount DECIMAL(10,2) DEFAULT 0,
-				total_amount DECIMAL(10,2) NOT NULL,
+				driver_id INT NOT NULL,
+				driver_name VARCHAR(150) NOT NULL,
+				sub_total DECIMAL(10,2) DEFAULT 0,
+				gross_total DECIMAL(10,2) NOT NULL,
 				paid_amount DECIMAL(10,2) DEFAULT 0,
-				currency VARCHAR(10) NOT NULL DEFAULT 'AED',
-				status ENUM('RECEIVED','PENDING','DELIVERED','PROCESSING','DELETED','OUT_FOR_DELIVERY') NOT NULL DEFAULT 'PENDING',
-        all_items VARCHAR(5000),
+        pending_amount DECIMAL(10,2) DEFAULT 0,
+				discount DECIMAL(10,2) DEFAULT 0,
+				tax DECIMAL(10,2) DEFAULT 0,
+				payment_method VARCHAR(50),
+				status ENUM('Pending','Processing','Delivered','Cancelled') NOT NULL DEFAULT 'Pending',
+				remark TEXT,
+        addon JSON,
+        item_list JSON NOT NULL,
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 			)
 		`;
@@ -151,13 +184,14 @@ exports.getOrders = async (req, res) => {
     );
 
     const [rows] = await db.query(
-      `SELECT * FROM orders ORDER BY id ASC LIMIT ? OFFSET ?`,
+      `SELECT * FROM orders ORDER BY id DESC LIMIT ? OFFSET ?`,
       [limit, offset]
     );
 
     //  JSON parse here
     rows.forEach(row => {
-      if (row.all_items) row.all_items = JSON.parse(row.all_items);
+      if (row.addon) row.addon = JSON.parse(row.addon);
+      if (row.item_list) row.item_list = JSON.parse(row.item_list);
     });
 
     res.json({
@@ -186,7 +220,11 @@ exports.getOrderById = async (req, res) => {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    res.json({ success: true, data: rows[0] });
+    const order = rows[0];
+    if (order.addon) order.addon = JSON.parse(order.addon);
+    if (order.item_list) order.item_list = JSON.parse(order.item_list);
+
+    res.json({ success: true, data: order });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
