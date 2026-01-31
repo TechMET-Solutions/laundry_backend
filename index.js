@@ -23,6 +23,7 @@ const serviceTypeRoutes = require("./src/routes/service.routes");
 const serviceCategoryRoutes = require("./src/routes/service.routes");
 const serviceAddonRoutes = require("./src/routes/service.routes");
 const orderRoutes = require("./src/routes/order.routes");
+const reportRoutes = require("./src/routes/report.routes")
 
   
  
@@ -48,6 +49,7 @@ app.use("/api/expenses", require("./src/routes/expenses.routes"));
 app.use("/api/location_management/emirates", locationRoutes);
 app.use("/api/areas", areaRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/reports", reportRoutes);
 
 const PORT = process.env.PORT || 5000;
 
