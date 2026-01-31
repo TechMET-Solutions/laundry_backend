@@ -63,7 +63,7 @@ exports.createServiceType = async (req, res) => {
                 id: result.insertId,
                 name,
                 abbreviation,
-                image,
+                image: imagePath,
                 status,
             },
         });
@@ -99,7 +99,14 @@ exports.updateServiceType = async (req, res) => {
         const [result] = await db.query(updateSQL, [name?.trim() || null, abbreviation?.trim() || null, imagePath || null, status ?? null, id]);
         if (result.affectedRows === 0) return res.status(404).json({ success: false, message: "Not found" });
 
-        res.json({ success: true, message: "Updated successfully" });
+        // Get updated data
+        const [updatedRows] = await db.query(`SELECT * FROM service_type WHERE id = ?`, [id]);
+
+        res.json({ 
+            success: true, 
+            message: "Updated successfully",
+            data: updatedRows[0]
+        });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }

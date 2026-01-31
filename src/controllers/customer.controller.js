@@ -87,23 +87,38 @@ exports.createCustomer = async (req, res) => {
 // ✅ GET ALL Customers
 exports.getAllCustomers = async (req, res) => {
     try {
-        const { search = "" } = req.query;
+        const page =parseInt(req.query.page)||1;
+        const limit = parseInt(req.query.limit)||10;
+        const search = req.query.search || "";
+        const offset = (page - 1)*limit;
 
-        let sql = `SELECT * FROM Customers`;
-        let values = [];
+        let countQuery = "SELECT COUNT(*) AS total FROM customers";
+        let dataQuery = "SELECT * FROM customers";
+        let params = [];
+        let countParams = [];
 
-        if (search.trim()) {
-            sql += ` WHERE name LIKE ?`;
-            values.push(`%${search}%`);
+        if (search) {
+            countQuery += " WHERE name LIKE ? OR mobile_no LIKE ?";
+            dataQuery += " WHERE name LIKE ? OR mobile_no LIKE ?";
+            const searchTerm = `%${search}%`;
+            params = [searchTerm, searchTerm, limit, offset];
+            countParams = [searchTerm, searchTerm];
+        } else {
+            params = [limit, offset];
         }
 
-        sql += ` ORDER BY id DESC`;
-
-        const [rows] = await db.query(sql, values);
+        const [[{total}]] = await db.query(countQuery, countParams);
+        const [rows] = await db.query(`${dataQuery} ORDER BY id DESC LIMIT ? OFFSET ?`, params);
 
         res.json({
             success: true,
             data: rows,
+            pagination:{
+                total,
+                page,
+                limit,
+                 totalPages: Math.ceil(total / limit),
+            },
         });
     } catch (err) {
         res.status(500).json({
