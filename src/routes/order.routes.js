@@ -7,9 +7,11 @@ const {
   getOrderById, 
   softDelete,
   hardDelete,
+  addPayment,
 } = require("../controllers/order.controller");
 
 router.post("/create", createOrder);
+router.post("/addpayment", addPayment);
 router.get("/list", getOrders);
 router.get("/list/:id", getOrderById);
 router.put("/update/:id", softDelete);

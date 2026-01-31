@@ -2,43 +2,44 @@ const db = require("../../config/database");
 const ExcelJS = require('exceljs');
 const puppeteer = require('puppeteer');
 
-
-// GET Service List
 exports.getPaymentReport = async (req, res) => {
     try {
-        // Pagination parameters
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
 
-        // Get total count for pagination metadata
-        const [countResult] = await db.query(`SELECT COUNT(*) as total FROM orders`);
+        // 🔢 Total payments count (NOT orders)
+        const [countResult] = await db.query(
+            `SELECT COUNT(*) AS total FROM payments WHERE payment_status = 'success'`
+        );
+
         const total = countResult[0].total;
         const totalPages = Math.ceil(total / limit);
 
-        // Get paginated data
+        // 📊 Payment report data
         const [rows] = await db.query(`
-            SELECT 
-                order_date as date, 
-                order_code as order_id, 
-                customer_name as customer, 
-                driver_name as driver, 
-                paid_amount as amount, 
-                payment_method as payment_type, 
-                remark as note 
-            FROM orders
-            ORDER BY order_date DESC
-            LIMIT ? OFFSET ?
-        `, [limit, offset]);
+      SELECT 
+        p.created_at AS date,
+        o.order_code AS order_id,
+        o.customer_name AS customer,
+        o.driver_name AS driver,
+        p.amount AS amount,
+        p.payment_method AS payment_type,
+        o.remark AS note
+      FROM payments p
+      INNER JOIN orders o ON o.id = p.order_id
+      WHERE p.payment_status = 'success'
+      ORDER BY p.created_at DESC
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
 
-        // Format the response to match the UI requirements
         const reportData = rows.map((row, index) => ({
             sr_no: offset + index + 1,
             date: row.date,
             order_id: row.order_id,
             customer: row.customer,
             driver: row.driver,
-            amount: Number(row.amount || 0).toFixed(2),
+            amount: Number(row.amount).toFixed(2),
             payment_type: row.payment_type,
             note: row.note || ""
         }));
@@ -55,10 +56,12 @@ exports.getPaymentReport = async (req, res) => {
                 hasPrevPage: page > 1
             }
         });
+
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
 
 // 1. GET DATA API
 
