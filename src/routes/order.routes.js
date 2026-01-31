@@ -8,6 +8,7 @@ const {
   softDelete,
   hardDelete,
   addPayment,
+  revokeOrder,
 } = require("../controllers/order.controller");
 
 router.post("/create", createOrder);
@@ -15,6 +16,7 @@ router.post("/addpayment", addPayment);
 router.get("/list", getOrders);
 router.get("/list/:id", getOrderById);
 router.put("/update/:id", softDelete);
+router.put("/revoke/:id/", revokeOrder);
 router.delete("/delete/:id", hardDelete);
 
 module.exports = router;
