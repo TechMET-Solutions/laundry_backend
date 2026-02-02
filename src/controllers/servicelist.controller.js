@@ -155,8 +155,17 @@ exports.getServiceList = async (req, res) => {
         `;
         await db.query(createTableSQL);
 
-        // Query results sorted by ID
-        const [rows] = await db.query("SELECT * FROM services ORDER BY id ASC");
+        // Pagination parameters
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+
+        // Get total count
+        const [countResult] = await db.query("SELECT COUNT(*) as total FROM services");
+        const total = countResult[0].total;
+
+        // Query results with pagination
+        const [rows] = await db.query("SELECT * FROM services ORDER BY id ASC LIMIT ? OFFSET ?", [limit, offset]);
 
         // Map through rows to parse the service_types JSON string back into an object/array
         const formattedRows = rows.map(row => ({
@@ -166,9 +175,19 @@ exports.getServiceList = async (req, res) => {
                 : row.service_types
         }));
 
+        const totalPages = Math.ceil(total / limit);
+
         res.json({
             success: true,
             data: formattedRows,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPrevPage: page > 1
+            }
         });
     } catch (err) {
         console.error("Get Service List Error:", err);
