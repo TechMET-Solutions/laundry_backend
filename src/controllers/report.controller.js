@@ -113,8 +113,6 @@ exports.getDailyReport = async (req, res) => {
     }
 };
 
-
-// app.get('',
 exports.getExcelReport = async (req, res) => {
     const { startDate, endDate } = req.query;
     try {
@@ -144,9 +142,6 @@ exports.getExcelReport = async (req, res) => {
         res.status(500).send(error.message);
     }
 };
-
-
-
 
 exports.printDailyReport = async (req, res) => {
     const { startDate, endDate } = req.query;
@@ -258,6 +253,72 @@ exports.printDailyReport = async (req, res) => {
 
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// Tax Report
+exports.printTaxReport = async (req, res) => {
+    try {
+        const { start_date, end_date } = req.query;
+
+        // 🔒 Validation
+        if (!start_date || !end_date) {
+            return res.status(400).json({
+                success: false,
+                message: "start_date and end_date are required",
+            });
+        }
+
+        const reportSQL = `
+              SELECT 
+                id,
+                order_code,
+                order_date,
+                sub_total,
+                tax,
+                gross_total
+              FROM orders
+              WHERE order_date BETWEEN ? AND ?
+              ORDER BY order_date DESC
+            `;
+        
+                const [rows] = await db.query(reportSQL, [
+                    start_date,
+                    end_date,
+                ]);
+        
+        // Optional totals
+        const totalDebit = rows.reduce(
+            (sum, item) => sum + Number(item.gross_total),
+            0
+        );
+
+        const totalCredit = rows.reduce(
+            (sum, item) => sum + Number(item.tax || 0),
+            0
+        );
+        
+        return res.status(200).json({
+            success: true,
+            message: "Tax report fetched successfully",
+            filters: {
+                start_date,
+                end_date,
+            },
+            summary: {
+                total_records: rows.length,
+                total_debit: totalDebit,
+                total_credit: totalCredit,
+            },
+            data: rows,
+        });
+        
+    } catch (err) {
+        console.error(" Tax Report Error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch tax report",
+        });
     }
 };
 
