@@ -160,12 +160,46 @@ exports.getServiceList = async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
 
-        // Get total count
-        const [countResult] = await db.query("SELECT COUNT(*) as total FROM services");
+        // Filter parameters
+        const search = req.query.search || "";
+        const category = req.query.category || "";
+        const status = req.query.status || "";
+        const sortField = req.query.sortField || "id";
+        const sortDirection = req.query.sortDirection === "desc" ? "DESC" : "ASC";
+
+        // Build WHERE clause
+        let whereConditions = [];
+        let queryParams = [];
+
+        if (search) {
+            whereConditions.push("(name LIKE ? OR category LIKE ?)");
+            queryParams.push(`%${search}%`, `%${search}%`);
+        }
+
+        if (category) {
+            whereConditions.push("category = ?");
+            queryParams.push(category);
+        }
+
+        if (status !== "") {
+            whereConditions.push("status = ?");
+            queryParams.push(parseInt(status));
+        }
+
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
+
+        // Validate sort field to prevent SQL injection
+        const allowedSortFields = ["id", "name", "category", "status", "createdAt"];
+        const validSortField = allowedSortFields.includes(sortField) ? sortField : "id";
+
+        // Get total count with filters
+        const countQuery = `SELECT COUNT(*) as total FROM services ${whereClause}`;
+        const [countResult] = await db.query(countQuery, queryParams);
         const total = countResult[0].total;
 
-        // Query results with pagination
-        const [rows] = await db.query("SELECT * FROM services ORDER BY id ASC LIMIT ? OFFSET ?", [limit, offset]);
+        // Query results with pagination, filters, and sorting
+        const selectQuery = `SELECT * FROM services ${whereClause} ORDER BY ${validSortField} ${sortDirection} LIMIT ? OFFSET ?`;
+        const [rows] = await db.query(selectQuery, [...queryParams, limit, offset]);
 
         // Map through rows to parse the service_types JSON string back into an object/array
         const formattedRows = rows.map(row => ({
