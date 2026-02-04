@@ -355,12 +355,107 @@ exports.getSalesReport = async (req, res) => {
 
 exports.getClothWiseReport = async (req, res) => {
     try {
-        
+        const {
+            start_date,
+            end_date,
+            services_list,   // service name (Cap, Shirt...)
+            services_types,  // service type (Re-Wash, Washing...)
+            driver_name
+        } = req.query;
+
+        if (!start_date || !end_date) {
+            return res.status(400).json({
+                success: false,
+                message: "start_date and end_date are required"
+            });
+        }
+
+        let whereClauses = [];
+        let params = [];
+
+        // 📅 Date filter
+        whereClauses.push("DATE(order_date) BETWEEN ? AND ?");
+        params.push(start_date, end_date);
+
+        // 🚚 Driver filter
+        if (driver_name) {
+            whereClauses.push("driver_name = ?");
+            params.push(driver_name);
+        }
+
+        const whereSQL = whereClauses.length
+            ? `WHERE ${whereClauses.join(" AND ")}`
+            : "";
+
+        // 🔹 STEP 1: Fetch orders only
+        const query = `
+      SELECT
+        order_code,
+        order_date,
+        driver_name,
+        item_list
+      FROM orders
+      ${whereSQL}
+      ORDER BY order_date DESC
+    `;
+
+        const [orders] = await db.query(query, params);
+
+        // 🔹 STEP 2: Explode item_list JSON in Node.js
+        let reportRows = [];
+
+        for (const order of orders) {
+            let items = [];
+
+            try {
+                items = Array.isArray(order.item_list)
+                    ? order.item_list
+                    : JSON.parse(order.item_list);
+            } catch (e) {
+                console.error("Invalid item_list JSON for order:", order.order_code);
+                continue;
+            }
+
+            for (const item of items) {
+                // 👕 service filter
+                if (services_list && item.name !== services_list) continue;
+
+                // 🧺 service type filter
+                if (services_types && item.type !== services_types) continue;
+
+                reportRows.push({
+                    date: order.order_date,
+                    order_code: order.order_code,
+                    driver_name: order.driver_name,
+                    service_name: item.name,
+                    service_type: item.type,
+                    service_qty: Number(item.qty) || 0
+                });
+            }
+        }
+
+        // 🔢 Summary
+        const totalQty = reportRows.reduce(
+            (sum, r) => sum + r.service_qty,
+            0
+        );
+
+        return res.json({
+            success: true,
+            summary: {
+                total_records: reportRows.length,
+                total_qty: totalQty
+            },
+            data: reportRows
+        });
+
     } catch (err) {
         console.error("Cloth Wise Report Error:", err);
         return res.status(500).json({
             success: false,
             message: "Failed to fetch Cloth Wise report",
+            error: err.message
         });
     }
-}
+};
+
