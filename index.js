@@ -24,8 +24,6 @@ const orderRoutes = require("./src/routes/order.routes");
 const reportsRoutes = require("./src/routes/report.routes");
 
   
- 
-
 
 app.get("/", (req, res) => {
     res.send("✅ Laundry POS System Backend Server Running...");
