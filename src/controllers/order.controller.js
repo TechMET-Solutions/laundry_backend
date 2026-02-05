@@ -448,6 +448,193 @@ exports.revokeOrder = async (req, res) => {
 };
 
 
+// Update Driver Info
+exports.updateDriver = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { driverId, driverName } = req.body;
+
+    // Validate required fields
+    if (!driverId || !driverName) {
+      return res.status(400).json({
+        success: false,
+        message: "Driver ID and Driver Name are required"
+      });
+    }
+
+    // Check if order exists
+    const [[order]] = await db.query(
+      `SELECT id FROM orders WHERE id = ?`,
+      [id]
+    );
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+
+    // Update driver information
+    const [result] = await db.query(
+      `UPDATE orders 
+       SET driver_id = ?, driver_name = ? 
+       WHERE id = ?`,
+      [driverId, driverName, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Failed to update driver information"
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Driver information updated successfully",
+      data: {
+        orderId: id,
+        driverId,
+        driverName
+      }
+    });
+
+  } catch (err) {
+    console.error("updateDriver error:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+};
+
+// Update Order Details
+exports.updateOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      deliveryDate, 
+      customerName, 
+      driverName,
+      driverId,
+      itemList, 
+      addon, 
+      discount, 
+      remark,
+      subTotal,
+      grossTotal,
+      tax,
+      orderStatus
+    } = req.body;
+
+    // Check if order exists
+    const [[order]] = await db.query(
+      `SELECT id FROM orders WHERE id = ?`,
+      [id]
+    );
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+
+    // Build dynamic update query
+    const updateFields = [];
+    const updateValues = [];
+
+    if (deliveryDate !== undefined) {
+      updateFields.push('delivery_date = ?');
+      updateValues.push(deliveryDate);
+    }
+    if (customerName !== undefined) {
+      updateFields.push('customer_name = ?');
+      updateValues.push(customerName);
+    }
+    if (driverName !== undefined) {
+      updateFields.push('driver_name = ?');
+      updateValues.push(driverName);
+    }
+    if (driverId !== undefined) {
+      updateFields.push('driver_id = ?');
+      updateValues.push(driverId);
+    }
+    if (itemList !== undefined) {
+      updateFields.push('item_list = ?');
+      updateValues.push(JSON.stringify(itemList));
+    }
+    if (addon !== undefined) {
+      updateFields.push('addon = ?');
+      updateValues.push(JSON.stringify(addon));
+    }
+    if (discount !== undefined) {
+      updateFields.push('discount = ?');
+      updateValues.push(discount);
+    }
+    if (remark !== undefined) {
+      updateFields.push('remark = ?');
+      updateValues.push(remark);
+    }
+    if (subTotal !== undefined) {
+      updateFields.push('sub_total = ?');
+      updateValues.push(subTotal);
+    }
+    if (grossTotal !== undefined) {
+      updateFields.push('gross_total = ?');
+      updateValues.push(grossTotal);
+    }
+    if (tax !== undefined) {
+      updateFields.push('tax = ?');
+      updateValues.push(tax);
+    }
+    if (orderStatus !== undefined) {
+      updateFields.push('order_status = ?');
+      updateValues.push(orderStatus);
+    }
+
+    // If no fields to update
+    if (updateFields.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No fields provided to update"
+      });
+    }
+
+    // Add order ID to values
+    updateValues.push(id);
+
+    // Execute update
+    const [result] = await db.query(
+      `UPDATE orders 
+       SET ${updateFields.join(', ')} 
+       WHERE id = ?`,
+      updateValues
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Failed to update order"
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Order updated successfully",
+      data: { orderId: id }
+    });
+
+  } catch (err) {
+    console.error("updateOrder error:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+};
+
 // Hard DELETE order (Only if no payments)
 exports.hardDelete = async (req, res) => {
   const conn = await db.getConnection();
