@@ -37,11 +37,11 @@ app.get("/", (req, res) => {
 app.use('/uploads', express.static('uploads'));
 
 // 🔐 Protect all API routes except login
-app.use("/api", (req, res, next) => {
-    const openPaths = ["/employees/login"];
-    if (openPaths.includes(req.path)) return next();
-    return requireAuth(req, res, next);
-});
+// app.use("/api", (req, res, next) => {
+//     const openPaths = ["/employees/login"];
+//     if (openPaths.includes(req.path)) return next();
+//     return requireAuth(req, res, next);
+// });
 
 app.use("/api/employees", authRoutes);
 app.use("/api/employees", employeeRoutes);

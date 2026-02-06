@@ -136,24 +136,74 @@ exports.updateServiceList = async (req, res) => {
     }
 };
 
+exports.getAllServicesSearch = async (req, res) => {
+    try {
+        let { search = "", status } = req.query;
+
+        /** 🔹 Base WHERE */
+        let where = "WHERE 1=1";
+        let params = [];
+
+        // 🔎 Search in name, category, and service_types JSON
+        if (search) {
+            where += ` AND (
+        name LIKE ? 
+        OR category LIKE ? 
+        OR JSON_SEARCH(service_types, 'one', ?) IS NOT NULL
+      )`;
+            const like = `%${search}%`;
+            params.push(like, like, search);
+        }
+
+        // 🔘 Optional status filter
+        if (status !== undefined) {
+            where += ` AND status = ?`;
+            params.push(status);
+        }
+
+        /** 🔹 Query without pagination */
+        const sql = `
+      SELECT *
+      FROM services
+      ${where}
+      ORDER BY sorting_order ASC, createdAt DESC
+    `;
+
+        const [rows] = await db.query(sql, params);
+
+        return res.status(200).json({
+            success: true,
+            message: "Services fetched successfully",
+            total: rows.length,
+            data: rows,
+        });
+    } catch (err) {
+        console.error("Search Services Error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Internal Server Error",
+        });
+    }
+};
+
 // GET Service List
 exports.getServiceList = async (req, res) => {
     try {
         // Create table if not exists
-        const createTableSQL = `
-            CREATE TABLE IF NOT EXISTS services (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                addIcon VARCHAR(255) NOT NULL,
-                category VARCHAR(100) NOT NULL,
-                sorting_order INT DEFAULT 0,
-                sqf_status TINYINT(1) DEFAULT 0,
-                service_types JSON NOT NULL,
-                status TINYINT(1) DEFAULT 1,
-                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `;
-        await db.query(createTableSQL);
+        // const createTableSQL = `
+        //     CREATE TABLE IF NOT EXISTS services (
+        //         id INT AUTO_INCREMENT PRIMARY KEY,
+        //         name VARCHAR(100) NOT NULL,
+        //         addIcon VARCHAR(255) NOT NULL,
+        //         category VARCHAR(100) NOT NULL,
+        //         sorting_order INT DEFAULT 0,
+        //         sqf_status TINYINT(1) DEFAULT 0,
+        //         service_types JSON NOT NULL,
+        //         status TINYINT(1) DEFAULT 1,
+        //         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        //     )
+        // `;
+        // await db.query(createTableSQL);
 
         // Pagination parameters
         const page = parseInt(req.query.page) || 1;

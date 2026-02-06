@@ -1,5 +1,6 @@
-const db = require("../../config/database");
 
+
+const db = require("../../config/database");
 
 exports.createExpenses = async (req, res) => {
     try {
@@ -8,38 +9,39 @@ exports.createExpenses = async (req, res) => {
             category,
             amount,
             payment_mode,
-            tax,
-            note,
-
+            tax = 0,
+            note = null,
+            created_by
         } = req.body;
 
+        // ✅ Basic validation
+        if (!date || !category || !amount || !payment_mode || !created_by) {
+            return res.status(400).json({ message: "Required fields are missing" });
+        }
+
+        // ⚠️ Table creation should be in migration, but fixing syntax here
         const createTableSQL = `
-        create table if not exists expenses(
-            id int auto_increment primary key,
-            date date not null,
-            category varchar(100) not null,
-            amount decimal(10,2) not null,
-            payment_mode varchar(100) not null,
-            tax decimal(10,2),
-            note varchar(255),
-            createdAt timestamp default current_timestamp
-        )
-        `;
+      CREATE TABLE IF NOT EXISTS expenses (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        date DATE NOT NULL,
+        category VARCHAR(100) NOT NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        payment_mode VARCHAR(100) NOT NULL,
+        tax DECIMAL(10,2) DEFAULT 0,
+        note VARCHAR(255),
+        created_by VARCHAR(100) NOT NULL,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
 
         await db.query(createTableSQL);
 
+        // ✅ Insert query
         const insertSQL = `
-        insert into expenses
-        (
-            date,
-            category,
-            amount,
-            payment_mode,
-            tax,
-            note
-        )
-        values(?,?,?,?,?,?)
-        `;
+      INSERT INTO expenses
+      (date, category, amount, payment_mode, tax, note, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
 
         const [result] = await db.query(insertSQL, [
             date,
@@ -48,13 +50,20 @@ exports.createExpenses = async (req, res) => {
             payment_mode,
             tax,
             note,
+            created_by
         ]);
-        console.log(result);
-        res.status(201).json({ message: "Expenses created successfully", id: result.insertId });
+
+        return res.status(201).json({
+            message: "Expense created successfully",
+            id: result.insertId
+        });
+
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error("Create Expense Error:", err);
+        return res.status(500).json({ error: "Internal Server Error" });
     }
-}
+};
+
 
 // ✅ GET ALL Expences
 

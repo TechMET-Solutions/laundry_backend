@@ -258,8 +258,6 @@ exports.exportExcelFile = async (req, res) => {
             { header: "Map Location", key: "map_location", width: 25 },
             { header: "Tax Number", key: "tax_number", width: 20 },
             { header: "Address", key: "address", width: 30 },
-            { header: "Status", key: "status", width: 10 },
-            { header: "Created At", key: "createdAt", width: 25 },
         ];
 
         customers.forEach((customer) => {
