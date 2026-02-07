@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS orders (
   remark TEXT,
   addon JSON,
   item_list JSON NOT NULL,
+  created_by VARCHAR(100) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS payments (
   payment_method VARCHAR(50),
   payment_stage ENUM('advance','partial','final') DEFAULT 'partial',
   payment_status ENUM('success','pending','failed') DEFAULT 'success',
+  created_by VARCHAR(100),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
@@ -40,11 +42,12 @@ CREATE TABLE IF NOT EXISTS payments (
 
 exports.createOrder = async (req, res) => {
   const conn = await db.getConnection();
+
   try {
     await conn.beginTransaction();
 
     const {
-      addon,
+      addon = [],
       orderDate,
       deliveryDate,
       customerName,
@@ -56,7 +59,8 @@ exports.createOrder = async (req, res) => {
       discount = 0,
       tax = 0,
       remark = "",
-      itemList,
+      itemList = [],
+      created_by,
 
       // payment (optional)
       paidAmount = 0,
@@ -64,19 +68,38 @@ exports.createOrder = async (req, res) => {
       paymentStage = "partial"
     } = req.body;
 
-    if (!orderDate || !deliveryDate || !customerName || !customerId || !driverId || !driverName || grossTotal === undefined) {
-      return res.status(400).json({ success: false, message: "Required fields missing" });
+    // ✅ Validation
+    if (
+      !orderDate ||
+      !deliveryDate ||
+      !customerName ||
+      !customerId ||
+      !driverId ||
+      !driverName ||
+      grossTotal === undefined ||
+      !created_by
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Required fields missing",
+      });
     }
 
-    await db.query(createOrderTable);
-    await db.query(createPaymentTable);
+    // ✅ Ensure tables inside transaction
+    await conn.query(createOrderTable);
+    await conn.query(createPaymentTable);
 
-    // 🔢 Generate order code
+    // 🔢 Generate order code safely (LOCK latest row)
     const [[lastRow]] = await conn.query(
-      `SELECT order_code FROM orders ORDER BY id DESC LIMIT 1`
+      `SELECT order_code 
+       FROM orders 
+       ORDER BY id DESC 
+       LIMIT 1 
+       FOR UPDATE`
     );
 
     let nextNumber = 1;
+
     if (lastRow?.order_code) {
       const lastNumber = parseInt(lastRow.order_code.split("-").pop(), 10);
       if (!isNaN(lastNumber)) nextNumber = lastNumber + 1;
@@ -87,14 +110,23 @@ exports.createOrder = async (req, res) => {
     // 🧾 Insert order
     const [orderResult] = await conn.query(
       `INSERT INTO orders (
-        order_code, order_date, delivery_date,
-        customer_id, customer_name,
-        driver_id, driver_name,
-        sub_total, gross_total,
-        discount, tax,
-        order_status, remark,
-        addon, item_list
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?, ?)`,
+        order_code,
+        order_date,
+        delivery_date,
+        customer_id,
+        customer_name,
+        driver_id,
+        driver_name,
+        sub_total,
+        gross_total,
+        discount,
+        tax,
+        order_status,
+        remark,
+        addon,
+        item_list,
+        created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?, ?, ?)`,
       [
         orderCode,
         orderDate,
@@ -108,43 +140,56 @@ exports.createOrder = async (req, res) => {
         discount,
         tax,
         remark,
-        JSON.stringify(addon),
-        JSON.stringify(itemList)
+        JSON.stringify(addon || []),
+        JSON.stringify(itemList || []),
+        created_by,
       ]
     );
 
     const orderId = orderResult.insertId;
 
     // 💰 Insert payment ONLY if paidAmount > 0
-    if (paidAmount > 0) {
+    if (Number(paidAmount) > 0) {
       await conn.query(
         `INSERT INTO payments (
-          order_id, amount, payment_method, payment_stage, payment_status
-        ) VALUES (?, ?, ?, ?, 'success')`,
-        [orderId, paidAmount, paymentMethod, paymentStage]
+          order_id,
+          amount,
+          payment_method,
+          payment_stage,
+          payment_status,
+          created_by
+        ) VALUES (?, ?, ?, ?, 'success', ?)`,
+        [orderId, paidAmount, paymentMethod, paymentStage, created_by]
       );
     }
 
     await conn.commit();
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Order created successfully",
       data: {
         orderId,
         orderCode,
         grossTotal,
-        paidAmount
-      }
+        paidAmount,
+      },
     });
-
   } catch (err) {
     await conn.rollback();
-    res.status(500).json({ success: false, error: err.message });
+
+    console.error("Create Order Error:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create order",
+      error: err.message,
+    });
   } finally {
     conn.release();
   }
 };
+
 
 exports.addPayment = async (req, res) => {
   const conn = await db.getConnection();
@@ -241,6 +286,67 @@ exports.addPayment = async (req, res) => {
 };
 
 // GET paginated orders
+// exports.getOrders = async (req, res) => {
+//   try {
+//     const page = parseInt(req.query.page, 10) || 1;
+//     const limit = parseInt(req.query.limit, 10) || 10;
+//     const offset = (page - 1) * limit;
+
+//     // 🔢 Total orders count
+//     const [[{ total }]] = await db.query(
+//       "SELECT COUNT(*) AS total FROM orders"
+//     );
+
+//     // 📦 Orders with payment summary
+//     const [rows] = await db.query(
+//       `
+//       SELECT
+//         o.*,
+//         IFNULL(SUM(p.amount), 0) AS paid_amount,
+//         (o.gross_total - IFNULL(SUM(p.amount), 0)) AS pending_amount,
+//         CASE
+//           WHEN IFNULL(SUM(p.amount), 0) = 0 THEN 'Pending'
+//           WHEN IFNULL(SUM(p.amount), 0) < o.gross_total THEN 'Partial'
+//           ELSE 'Paid'
+//         END AS payment_status
+//       FROM orders o
+//       LEFT JOIN payments p
+//         ON o.id = p.order_id
+//         AND p.payment_status = 'success'
+//       GROUP BY o.id
+//       ORDER BY o.id DESC
+//       LIMIT ? OFFSET ?
+//       `,
+//       [limit, offset]
+//     );
+
+//     // 🧹 JSON parse
+//     rows.forEach(row => {
+//       if (row.addon) row.addon = JSON.parse(row.addon);
+//       if (row.item_list) row.item_list = JSON.parse(row.item_list);
+
+//       // Ensure numbers
+//       row.paid_amount = Number(row.paid_amount);
+//       row.pending_amount = Number(row.pending_amount);
+//     });
+
+//     res.json({
+//       success: true,
+//       data: rows,
+//       pagination: {
+//         total,
+//         page,
+//         limit,
+//         totalPages: Math.ceil(total / limit),
+//       },
+//     });
+
+//   } catch (err) {
+//     console.error("getOrders error:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// };
+
 exports.getOrders = async (req, res) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;
@@ -256,18 +362,39 @@ exports.getOrders = async (req, res) => {
     const [rows] = await db.query(
       `
       SELECT 
-        o.*,
+        o.id,
+        o.order_code,
+        o.order_date,
+        o.delivery_date,
+        o.customer_id,
+        o.customer_name,
+        o.driver_id,
+        o.driver_name,
+        o.sub_total,
+        o.gross_total,
+        o.discount,
+        o.tax,
+        o.order_status,
+        o.remark,
+        o.addon,
+        o.item_list,
+        o.created_by,          -- ⭐ explicitly included
+        o.created_at,
+
         IFNULL(SUM(p.amount), 0) AS paid_amount,
         (o.gross_total - IFNULL(SUM(p.amount), 0)) AS pending_amount,
+
         CASE
           WHEN IFNULL(SUM(p.amount), 0) = 0 THEN 'Pending'
           WHEN IFNULL(SUM(p.amount), 0) < o.gross_total THEN 'Partial'
           ELSE 'Paid'
         END AS payment_status
+
       FROM orders o
       LEFT JOIN payments p 
         ON o.id = p.order_id 
         AND p.payment_status = 'success'
+
       GROUP BY o.id
       ORDER BY o.id DESC
       LIMIT ? OFFSET ?
@@ -275,19 +402,32 @@ exports.getOrders = async (req, res) => {
       [limit, offset]
     );
 
-    // 🧹 JSON parse
-    rows.forEach(row => {
-      if (row.addon) row.addon = JSON.parse(row.addon);
-      if (row.item_list) row.item_list = JSON.parse(row.item_list);
+    // 🧹 Safe JSON parse + number formatting
+    const parsedRows = rows.map(row => {
+      let addon = null;
+      let item_list = [];
 
-      // Ensure numbers
-      row.paid_amount = Number(row.paid_amount);
-      row.pending_amount = Number(row.pending_amount);
+      try {
+        addon = row.addon ? JSON.parse(row.addon) : null;
+      } catch { }
+
+      try {
+        item_list = row.item_list ? JSON.parse(row.item_list) : [];
+      } catch { }
+
+      return {
+        ...row,
+        addon,
+        item_list,
+        paid_amount: Number(row.paid_amount),
+        pending_amount: Number(row.pending_amount),
+        created_by: row.created_by || "System", // fallback
+      };
     });
 
     res.json({
       success: true,
-      data: rows,
+      data: parsedRows,
       pagination: {
         total,
         page,
@@ -301,6 +441,7 @@ exports.getOrders = async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
+
 
 exports.getOrderById = async (req, res) => {
   try {

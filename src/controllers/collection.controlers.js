@@ -15,36 +15,38 @@ exports.createCollection = async (req, res) => {
       phone_number,
       driver_id,
       comments,
+      created_by, // ⭐ NEW
     } = req.body;
 
     // ❌ STOP creating tables inside APIs (keeping only because you insisted)
-    const createTableSQL = `
-      CREATE TABLE IF NOT EXISTS collections (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        collection_code VARCHAR(30) NOT NULL UNIQUE,
-        collection_type ENUM('CLOTH', 'PAYMENT') NOT NULL,
-        customer_id INT NOT NULL,
-        customer_type VARCHAR(50) NULL,
-        pickup_date DATE NOT NULL,
-        time_slot VARCHAR(50) NOT NULL,
-        phone_number VARCHAR(20) NOT NULL,
-        driver_id INT NOT NULL,
-        status ENUM('SCHEDULED', 'DONE', 'CANCELLED') NOT NULL DEFAULT 'SCHEDULED',
-        created_by ENUM('SHOP', 'ADMIN', 'EMPLOYEE') NOT NULL DEFAULT 'SHOP',
-        comments TEXT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `;
-    await db.query(createTableSQL);
+        const createTableSQL = `
+          CREATE TABLE IF NOT EXISTS collections (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            collection_code VARCHAR(30) NOT NULL UNIQUE,
+            collection_type ENUM('CLOTH', 'PAYMENT') NOT NULL,
+            customer_id INT NOT NULL,
+            customer_type VARCHAR(50) NULL,
+            pickup_date DATE NOT NULL,
+            time_slot VARCHAR(50) NOT NULL,
+            phone_number VARCHAR(20) NOT NULL,
+            driver_id INT NOT NULL,
+            status ENUM('SCHEDULED', 'DONE', 'CANCELLED') NOT NULL DEFAULT 'SCHEDULED',
+            comments TEXT NULL,
+            created_by VARCHAR(100) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `;
+        await db.query(createTableSQL);
 
-    // 1. Validation
+    // 1️⃣ Validation
     if (
       !collection_type ||
       !customer_id ||
       !pickup_date ||
       !time_slot ||
       !phone_number ||
-      !driver_id
+      !driver_id ||
+      !created_by
     ) {
       return res.status(400).json({
         success: false,
@@ -52,7 +54,7 @@ exports.createCollection = async (req, res) => {
       });
     }
 
-    // 2. Get LAST collection_code (NOT COUNT)
+    // 2️⃣ Get LAST collection_code
     const [[lastRow]] = await db.query(`
       SELECT collection_code
       FROM collections
@@ -62,24 +64,22 @@ exports.createCollection = async (req, res) => {
 
     let nextNumber = 1;
 
-    if (lastRow && lastRow.collection_code) {
+    if (lastRow?.collection_code) {
       const lastNumber = parseInt(
         lastRow.collection_code.split("-").pop(),
         10
       );
 
-      if (!isNaN(lastNumber)) {
-        nextNumber = lastNumber + 1;
-      }
+      if (!isNaN(lastNumber)) nextNumber = lastNumber + 1;
     }
 
-    const collection_code = `TMS/COL-${String(nextNumber).padStart(2, "0")}`;
+    const collection_code = `TMS/COL-${String(nextNumber).padStart(3, "0")}`;
 
-    // 3. Customer type handling
+    // 3️⃣ Customer type handling
     const finalCustomerType =
       collection_type === "PAYMENT" ? null : customer_type;
 
-    // 4. Insert
+    // 4️⃣ Insert
     const insertSQL = `
       INSERT INTO collections
       (
@@ -91,9 +91,10 @@ exports.createCollection = async (req, res) => {
         time_slot,
         phone_number,
         driver_id,
-        comments
+        comments,
+        created_by
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     await db.query(insertSQL, [
@@ -105,7 +106,8 @@ exports.createCollection = async (req, res) => {
       time_slot,
       phone_number,
       driver_id,
-      comments,
+      comments || null,
+      created_by, // ⭐ inserted
     ]);
 
     res.status(201).json({
