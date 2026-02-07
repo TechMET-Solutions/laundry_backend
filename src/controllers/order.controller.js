@@ -15,15 +15,25 @@ CREATE TABLE IF NOT EXISTS orders (
   gross_total DECIMAL(10,2) NOT NULL,
   discount DECIMAL(10,2) DEFAULT 0,
   tax DECIMAL(10,2) DEFAULT 0,
-  order_status ENUM('Pending','Processing','Delivered','Cancelled') DEFAULT 'Pending',
+  order_status ENUM(
+    'Order Received',
+    'Processing',
+    'Ready to Deliver',
+    'Out for Delivery',
+    'Partial Delivery',
+    'Delivered',
+    'Returned',
+    'Pending Delivery',
+    'Deleted'
+  ) DEFAULT 'Order Received',
   remark TEXT,
   addon JSON,
   item_list JSON NOT NULL,
   created_by VARCHAR(100) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
 `;
+
 
 const createPaymentTable = `
 CREATE TABLE IF NOT EXISTS payments (
@@ -126,7 +136,7 @@ exports.createOrder = async (req, res) => {
         addon,
         item_list,
         created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Order Received', ?, ?, ?, ?)`,
       [
         orderCode,
         orderDate,
@@ -284,68 +294,6 @@ exports.addPayment = async (req, res) => {
     conn.release();
   }
 };
-
-// GET paginated orders
-// exports.getOrders = async (req, res) => {
-//   try {
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = parseInt(req.query.limit, 10) || 10;
-//     const offset = (page - 1) * limit;
-
-//     // 🔢 Total orders count
-//     const [[{ total }]] = await db.query(
-//       "SELECT COUNT(*) AS total FROM orders"
-//     );
-
-//     // 📦 Orders with payment summary
-//     const [rows] = await db.query(
-//       `
-//       SELECT
-//         o.*,
-//         IFNULL(SUM(p.amount), 0) AS paid_amount,
-//         (o.gross_total - IFNULL(SUM(p.amount), 0)) AS pending_amount,
-//         CASE
-//           WHEN IFNULL(SUM(p.amount), 0) = 0 THEN 'Pending'
-//           WHEN IFNULL(SUM(p.amount), 0) < o.gross_total THEN 'Partial'
-//           ELSE 'Paid'
-//         END AS payment_status
-//       FROM orders o
-//       LEFT JOIN payments p
-//         ON o.id = p.order_id
-//         AND p.payment_status = 'success'
-//       GROUP BY o.id
-//       ORDER BY o.id DESC
-//       LIMIT ? OFFSET ?
-//       `,
-//       [limit, offset]
-//     );
-
-//     // 🧹 JSON parse
-//     rows.forEach(row => {
-//       if (row.addon) row.addon = JSON.parse(row.addon);
-//       if (row.item_list) row.item_list = JSON.parse(row.item_list);
-
-//       // Ensure numbers
-//       row.paid_amount = Number(row.paid_amount);
-//       row.pending_amount = Number(row.pending_amount);
-//     });
-
-//     res.json({
-//       success: true,
-//       data: rows,
-//       pagination: {
-//         total,
-//         page,
-//         limit,
-//         totalPages: Math.ceil(total / limit),
-//       },
-//     });
-
-//   } catch (err) {
-//     console.error("getOrders error:", err);
-//     res.status(500).json({ success: false, error: err.message });
-//   }
-// };
 
 exports.getOrders = async (req, res) => {
   try {
@@ -520,16 +468,24 @@ exports.getOrderById = async (req, res) => {
   }
 };
 
-// Soft DELETE (Cancel Order)
+
 exports.softDelete = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Validate id
+    if (!id || isNaN(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order id",
+      });
+    }
+
     const [result] = await db.query(
       `
       UPDATE orders
-      SET order_status = 'Cancelled'
-      WHERE id = ?
+      SET order_status = 'Deleted'
+      WHERE id = ? AND order_status != 'Deleted'
       `,
       [id]
     );
@@ -537,33 +493,41 @@ exports.softDelete = async (req, res) => {
     if (result.affectedRows === 0) {
       return res.status(404).json({
         success: false,
-        message: "Order not found"
+        message: "Order not found or already deleted",
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
-      message: "Order cancelled successfully"
+      message: "Order cancelled successfully",
     });
-
   } catch (err) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      error: err.message
+      message: "Failed to delete order",
+      error: err.message,
     });
   }
 };
 
-// Revoke / Restore Order
+
 exports.revokeOrder = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Validate id
+    if (!id || isNaN(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order id",
+      });
+    }
+
     const [result] = await db.query(
       `
       UPDATE orders
-      SET order_status = 'Pending'
-      WHERE id = ? AND order_status = 'Cancelled'
+      SET order_status = 'Order Received'
+      WHERE id = ? AND order_status = 'Deleted'
       `,
       [id]
     );
@@ -571,22 +535,23 @@ exports.revokeOrder = async (req, res) => {
     if (result.affectedRows === 0) {
       return res.status(404).json({
         success: false,
-        message: "Order not found or already active"
+        message: "Order not found or not deleted",
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
-      message: "Order revoked successfully"
+      message: "Order restored successfully",
     });
-
   } catch (err) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      error: err.message
+      message: "Failed to restore order",
+      error: err.message,
     });
   }
 };
+
 
 
 // Update Driver Info
@@ -654,14 +619,14 @@ exports.updateDriver = async (req, res) => {
 exports.updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const { 
-      deliveryDate, 
-      customerName, 
+    const {
+      deliveryDate,
+      customerName,
       driverName,
       driverId,
-      itemList, 
-      addon, 
-      discount, 
+      itemList,
+      addon,
+      discount,
       remark,
       subTotal,
       grossTotal,
@@ -828,3 +793,62 @@ exports.hardDelete = async (req, res) => {
 };
 
 
+// Update order status
+
+exports.UpdateOrderStatus = async (req, res) => {
+  const orderId = req.params.id;
+  const { order_status } = req.body;
+
+  const validStatuses = [
+    "Order Received",
+    "Processing",
+    "Ready to Deliver",
+    "Out for Delivery",
+    "Partial Delivery",
+    "Delivered",
+    "Returned",
+    "Pending Delivery",
+    "Deleted"
+  ];
+
+  // Validate status
+  if (!validStatuses.includes(order_status)) {
+    return res.status(400).json({ message: "Invalid order status" });
+  }
+
+  try {
+    const [result] = await db.query(
+      "UPDATE orders SET order_status = ? WHERE id = ?",
+      [order_status, orderId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    res.json({ message: "Order status updated successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// router.get("/orders/:id/status",
+
+exports.getOrderById = async (req, res) => {
+  const orderId = req.params.id;
+
+  try {
+    const [rows] = await db.query(
+      "SELECT id, order_code, order_status FROM orders WHERE id = ?",
+      [orderId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    res.json(rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
